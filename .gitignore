@@ -1,0 +1,10 @@
+# Ignore build output and installed dependencies
+node_modules/
+dist/
+dist-ssr/
+.vite/
+
+# Local editor / OS files
+*.local
+.DS_Store
+Thumbs.db
