@@ -9,7 +9,6 @@ import { bigbangFormula } from './formulas/BigbangFormula'
 import { getQueryParams } from './utils/dom'
 
 /**
- * Ported from `js/main.js`.
  *
  * Engine bootstrap of the freefall experiment: the page parameters, the three.js
  * objects, the preloader of the static atlases, the render loop and the window

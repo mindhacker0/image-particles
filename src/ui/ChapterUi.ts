@@ -7,7 +7,6 @@ import { setUiState } from './store'
 import { uiNodes } from './uiNodes'
 
 /**
- * `js/ui/chapter_ui.js` ported to TypeScript.
  *
  * The markup used to live in `index.html` and the class toggles were applied with
  * `classList`; here the markup is rendered by React (`src/ui/**`) and the classes

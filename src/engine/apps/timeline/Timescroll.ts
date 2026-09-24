@@ -6,7 +6,6 @@ import { legacyScene } from '../../legacyScope'
 import type { TimelineLabel } from './TimelineLabel'
 
 /**
- * Ported from `js/apps/timeline/timescroll.js`.
  *
  * The timeline chapter of the freefall app: it buckets the atlas assets per
  * decade (`setup`), lays every decade out as a column of blocks of three items

@@ -5,8 +5,8 @@
  * reimplemented here on top of `fetch`.
  *
  * Used by:
- *   js/ui/partners_ui.js  -> Twix.ajax({ type: 'GET', url, success })
- *   js/ui/sidect.js       -> Twix.post(url, data, success) and .abort()
+ *   partners_ui.js  -> Twix.ajax({ type: 'GET', url, success })
+ *   sidect.js       -> Twix.post(url, data, success) and .abort()
  */
 
 interface AjaxOptions {

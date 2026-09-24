@@ -70,7 +70,6 @@ src/
     components/       Header, HelpHints, FooterNav, GacLogo
     partners/         js/ui/partners_ui.js ported (store, nodes, component, facade)
     sidecontent/      js/ui/sidect.js ported (dialogs, item panel, facade)
-    ui.css            styles owned by the React interface
   legacy/             compatibility layer (no engine logic)
     globals.ts        npm packages exposed as engine globals
     gsapLegacy.ts     GSAP 2 style TweenLite facade over npm gsap
@@ -81,77 +80,6 @@ src/
 css/main.css          original project stylesheet, bundled by Vite
 data/ imgs/           runtime static assets, copied to dist/ verbatim
 ```
-
-## Porting progress
-
-The engine was migrated file by file: a ported file moved to `src/engine/`, its
-globals are registered in `src/engine/install.ts` and the original `.js` file was
-deleted, so there is a single source of truth. The engine still reads those
-globals (they are what `window` lookups and `install.ts` publish) which is why the
-ports keep the original names and signatures.
-
-Ported (complete):
-
-| legacy file                    | TypeScript module                    |
-| ------------------------------ | ------------------------------------ |
-| `js/utils/functions_utils.js`  | `engine/utils/functions.ts`          |
-| `js/utils/color_utils.js`      | `engine/utils/color.ts`              |
-| `js/utils/dom_utils.js`        | `engine/utils/dom.ts`                |
-| `js/utils/event_dispatcher.js` | `engine/utils/events.ts`             |
-| `js/utils/GrowingPacker.js`    | `engine/utils/GrowingPacker.ts`      |
-| `js/utils/canvasUtils.js`      | `engine/utils/canvas.ts`             |
-| `js/utils/json_loader.js`      | `engine/utils/JSONLoader.ts`         |
-| `js/atlas/utils.js`            | `engine/atlas/utils.ts`              |
-| `js/atlas/texture.js`          | `engine/atlas/Texture.ts`            |
-| `js/atlas/asset.js`            | `engine/atlas/Asset.ts`              |
-| `js/atlas/geometry.js`         | `engine/atlas/Geometry.ts`           |
-| `js/atlas/material.js`         | `engine/atlas/Material.ts`           |
-| `js/atlas/mesh.js`             | `engine/atlas/Mesh.ts`               |
-| `js/atlas/lod/helpers/ImageDescriptor.js` | `engine/atlas/lod/helpers/ImageDescriptor.ts` |
-| `js/atlas/lod/helpers/LODDescriptor.js`   | `engine/atlas/lod/helpers/LODDescriptor.ts`   |
-| `js/atlas/lod/helpers/ImageLoader.js`     | `engine/atlas/lod/helpers/ImageLoader.ts`     |
-| `js/atlas/lod/helpers/ImagePool.js`       | `engine/atlas/lod/helpers/ImagePool.ts`       |
-| `js/atlas/lod/helpers/LoaderPool.js`      | `engine/atlas/lod/helpers/LoaderPool.ts`      |
-| `js/atlas/lod/lod_texture.js`             | `engine/atlas/lod/LODTexture.ts`              |
-| `js/atlas/lod/lod_geometry.js`            | `engine/atlas/lod/LODGeometry.ts`             |
-| `js/atlas/lod/lod_mesh.js`                | `engine/atlas/lod/LODMesh.ts`                 |
-| `js/atlas/lod/lod_item.js`                | `engine/atlas/lod/LODItem.ts`                 |
-| `js/atlas/lod/lod.js`                     | `engine/atlas/lod/lod.ts`                     |
-| `js/atlas/dates_material.js`   | `engine/atlas/DatesMaterial.ts`      |
-| `js/atlas/metadata_material.js`| `engine/atlas/MetadataMaterial.ts`   |
-| `js/atlas/formulas/reset_formula.js`  | `engine/formulas/ResetFormula.ts`  |
-| `js/atlas/formulas/color_formula.js`  | `engine/formulas/ColorFormula.ts`  |
-| `js/atlas/formulas/offset_formula.js` | `engine/formulas/OffsetFormula.ts` |
-| `js/atlas/formulas/random_formula.js` | `engine/formulas/RandomFormula.ts` |
-| `js/atlas/formulas/sphere_formula.js` | `engine/formulas/SphereFormula.ts` |
-| `js/atlas/formulas/wave_formula.js`   | `engine/formulas/WaveFormula.ts`   |
-| `js/ui/chapter_ui.js`                 | `ui/ChapterUi.ts` + `ui/**`        |
-| `js/atlas/mod.js`, `mod_mesh.js`      | `engine/atlas/MOD.ts`, `MODMesh.ts` |
-| `js/atlas/tsneSphere.js`              | `engine/atlas/TsneSphere.ts`       |
-| `js/utils/interactive_objects.js`     | `engine/utils/interactiveObjects.ts` |
-| `js/atlas/dateLabels.js`              | `engine/atlas/DateLabels.ts`       |
-| `js/atlas/metadatas.js`               | `engine/atlas/Metadatas.ts`        |
-| `js/data/models.js`                   | `engine/data/Models.ts`            |
-| `js/atlas/atlas.js`                   | `engine/atlas/Atlas.ts`            |
-| `js/camera/controls/*.js`             | `engine/camera/controls/*.ts`      |
-| `js/camera/clickManager.js`           | `engine/camera/ClickManager.ts`    |
-| `js/camera/cameraControls.js`         | `engine/camera/CameraControls.ts`  |
-| `js/main.js`                          | `engine/Main.ts`                   |
-| `js/atlas/formulas/bigbang_formula.js`| `engine/formulas/BigbangFormula.ts`|
-| `js/apps/timeline/timeline_label.js`  | `engine/apps/timeline/TimelineLabel.ts` |
-| `js/apps/timeline/timescroll.js`      | `engine/apps/timeline/Timescroll.ts` |
-| `js/apps/freefall/introItem.js`       | `engine/apps/freefall/IntroItem.ts`|
-| `js/apps/app_freefall.js`             | `engine/apps/AppFreefall.ts`       |
-| `js/ui/sidect.js`                     | `ui/sidecontent/**` + `SideContentFacade.ts` |
-| `js/ui/partners_ui.js`                | `ui/partners/**` + `PartnersUi.ts` |
-| `js/works/models.js`                  | `engine/workers/modelsWorker.ts`   |
-| `js/works/json_loader.js`             | `engine/workers/jsonLoaderWorker.ts` |
-
-Every classic script is ported, so `src/legacy/scriptOrder.ts`, the
-`legacyScriptUrls` `?url` glob and the whole `js/` tree are gone: there is no
-`<script>` list anymore, the boot order is the import graph plus
-`loadLegacyEngine()` (install the modules, seed the mock items, then
-`bootFreefall()` — the call that used to be the last line of `app_freefall.js`).
 
 ## React interface
 

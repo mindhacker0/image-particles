@@ -1231,3 +1231,7 @@ body.mobile .trivia {
 		left:35%;
 	}
 }
+
+#react-root {
+  display: contents;
+}

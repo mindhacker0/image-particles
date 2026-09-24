@@ -6,7 +6,6 @@ import { Header } from './components/Header'
 import { HelpHints } from './components/HelpHints'
 import { Partners } from './partners/Partners'
 import { SideContent } from './sidecontent/SideContent'
-import './ui.css'
 
 /**
  * React implementation of the experiment interface.

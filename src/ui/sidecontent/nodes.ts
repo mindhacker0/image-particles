@@ -11,13 +11,10 @@ export interface SideContentNodes {
   back: HTMLElement | null
   /** `dialog.help` */
   helpDialog: HTMLDialogElement | null
-  /** `dialog.app` */
-  appDialog: HTMLDialogElement | null
   /** `dialog.app a` (the app store links) */
 }
 
 export const sideContentNodes: SideContentNodes = {
   back: null,
-  helpDialog: null,
-  appDialog: null,
+  helpDialog: null
 }

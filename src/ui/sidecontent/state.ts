@@ -19,8 +19,6 @@ export type SideContentDialog = 'help' | 'app'
 export interface SideContentState {
   /** `dialog.help[open]` */
   helpOpened: boolean
-  /** `dialog.app[open]` */
-  appOpened: boolean
   /**
    * `.mdl-dialog-back.show` (the full page backdrop; see the `.show` utility
    * class of `css/main.css`)
@@ -46,7 +44,6 @@ export interface SideContentState {
 
 const initialState: SideContentState = {
   helpOpened: false,
-  appOpened: false,
   backShown: false,
   itemOpened: false,
   itemId: null,
@@ -87,8 +84,7 @@ export function useSideContentState(): SideContentState {
 export function openSideContentDialog(dialog: SideContentDialog): void {
   setSideContentState({
     helpOpened: dialog === 'help',
-    appOpened: dialog === 'app',
-    backShown: true,
+    backShown: true
   })
 }
 
@@ -96,7 +92,6 @@ export function openSideContentDialog(dialog: SideContentDialog): void {
 export function closeSideContentDialog(): void {
   setSideContentState({
     helpOpened: false,
-    appOpened: false,
-    backShown: false,
+    backShown: false
   })
 }

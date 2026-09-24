@@ -58,7 +58,6 @@ export class Sidect {
   /** never set to `true` by the legacy code either */
   opened = false
 
-  appDialog: HTMLDialogElement | null = null
   /**
    * `div.pages` does not exist in `index.html` anymore (it was already absent
    * from the page when this file was ported), so the lookup returns `null` just
@@ -74,7 +73,6 @@ export class Sidect {
   currentDialog: HTMLDialogElement | null = null
 
   constructor() {
-    this.appDialog = resolveElement(sideContentNodes.appDialog, 'dialog.app')
     //this.creditsDialog = document.querySelector('dialog.credits');
     this.container = document.querySelector('div.pages')
     //this.creditsButton = document.querySelector('#credits-dialog');
@@ -92,8 +90,6 @@ export class Sidect {
     //this.experimentReloadBtn.addEventListener('click', this.onExperimentReloadClick.bind(this), false);
     this.backDialog?.addEventListener('click', this.onBackPress.bind(this), false)
     //this.creditsDialog.querySelector('.close').addEventListener('click', this.onCloseCredits.bind(this));
-    this.appDialog?.querySelector('.close')?.addEventListener('click', this.onCloseApp.bind(this))
-
   }
 
   /**
@@ -102,7 +98,6 @@ export class Sidect {
    */
   private dialogIdOf(dialog: HTMLDialogElement | null): SideContentDialog | null {
     if (!dialog) return null
-    if (dialog === this.appDialog) return 'app'
     return null
   }
 
@@ -161,7 +156,4 @@ export class Sidect {
     this.closeCurrentDialog()
   }
 
-  onCloseApp(event?: Event): void {
-    this.closeCurrentDialog()
-  }
 }

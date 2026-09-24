@@ -10,7 +10,6 @@ import { DatesMaterial } from '../../atlas/DatesMaterial'
 import { legacyCamera } from '../../legacyScope'
 
 /**
- * Ported from `js/apps/timeline/timeline_label.js`.
  *
  * One date label of the timeline: the date is painted into a canvas
  * (`size` x `size / 4`), uploaded as a texture and displayed on a shared
