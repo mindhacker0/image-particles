@@ -12,7 +12,6 @@ import * as THREE from 'three'
  *   InstancedBufferGeometry           -> instanceCount               (renamed in r128)
  *     #maxInstancedCount
  *   Object3D#getWorldQuaternion()      -> getWorldQuaternion(target)  (target now required)
- *   WebGLRenderer#getSize()           -> getSize(target)             (target now required)
  */
 export function applyThreePrototypeCompat(): void {
   const bufferGeometry = THREE.BufferGeometry.prototype as unknown as Record<string, unknown>
@@ -68,29 +67,6 @@ export function applyThreePrototypeCompat(): void {
         this.instanceCount = value
       },
     })
-  }
-}
-
-/**
- * `WebGLRenderer#getSize()` used to create and return a Vector2 on its own;
- * newer revisions require the caller to pass a target. The legacy code calls it
- * with no argument and reads the result.
- *
- * three assigns `getSize` as an own property inside the constructor, so a
- * prototype override would be shadowed: the wrapper has to be installed per
- * instance, which this subclass does.
- */
-export class LegacyWebGLRenderer extends THREE.WebGLRenderer {
-  constructor(parameters?: THREE.WebGLRendererParameters) {
-    super(parameters)
-
-    const originalGetSize = this.getSize.bind(this)
-
-    this.getSize = (target?: THREE.Vector2): THREE.Vector2 => {
-      const result = target ?? new THREE.Vector2()
-      originalGetSize(result)
-      return result
-    }
   }
 }
 

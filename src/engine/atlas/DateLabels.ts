@@ -4,8 +4,10 @@ import {
   Mesh,
   ShaderMaterial,
   Texture,
+  Vector2,
   Vector3,
   type ShaderMaterialParameters,
+  type WebGLRenderer,
 } from 'three'
 import { TweenLite } from '../../legacy/gsapLegacy'
 import { atlasInstance, legacyCamera, markRenderNeeded } from '../legacyScope'
@@ -86,9 +88,9 @@ const materials: ShaderMaterial[] = []
 let mesh: DateLabelsMesh
 let ready = false
 
-/** legacy global owned by `js/main.js` */
-function legacyRenderer(): { getSize(): { width: number; height: number } } {
-  return (window as unknown as { renderer: { getSize(): { width: number; height: number } } }).renderer
+/** legacy global owned by `src/engine/Main.ts` (the render loop) */
+function legacyRenderer(): WebGLRenderer {
+  return (window as unknown as { renderer: WebGLRenderer }).renderer
 }
 
 function isPowerOfTwo(value: number): boolean {
@@ -248,7 +250,8 @@ export const dateLabels: DateLabels = (function (exports: DateLabels) {
     texture.needsUpdate = true
 
     // create the material
-    const r = legacyRenderer().getSize()
+    const r = new Vector2()
+    legacyRenderer().getSize(r)
     material = new ShaderMaterial({
       uniforms: {
         map: { type: 't', value: texture },
@@ -302,7 +305,8 @@ export const dateLabels: DateLabels = (function (exports: DateLabels) {
   }
 
   exports.update = function (): void {
-    const r = legacyRenderer().getSize()
+    const r = new Vector2()
+    legacyRenderer().getSize(r)
     materials.forEach((labelMaterial) => {
       labelMaterial.uniforms.ratio.value = r.width / r.height
       labelMaterial.uniforms.scale.value =

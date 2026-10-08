@@ -5,7 +5,7 @@ import Hammer from 'hammerjs'
 import Clipboard from 'clipboard'
 import 'material-design-lite'
 import { TweenLite, legacyEases } from './gsapLegacy'
-import { LegacyWebGLRenderer, applyThreePrototypeCompat, threeLegacyAliases } from './threeLegacyCompat'
+import { applyThreePrototypeCompat, threeLegacyAliases } from './threeLegacyCompat'
 import { Twix } from './twixLegacy'
 
 /**
@@ -31,7 +31,6 @@ export function installLegacyGlobals(): void {
     ...threeLegacyAliases,
     OrbitControls,
     TrackballControls,
-    WebGLRenderer: LegacyWebGLRenderer,
   }
 
   const scope = window as unknown as Record<string, unknown>

@@ -1,7 +1,6 @@
-import { Color, PerspectiveCamera, Scene, Vector2 } from 'three'
+import { Color, PerspectiveCamera, Scene, Vector2, WebGLRenderer } from 'three'
 import { TweenLite, legacyEases } from '../legacy/gsapLegacy'
 import { publishGlobals } from '../legacy/publishGlobals'
-import { LegacyWebGLRenderer } from '../legacy/threeLegacyCompat'
 import { Atlas } from './atlas/Atlas'
 import { lod } from './atlas/lod/lod'
 import { clickManager } from './camera/ClickManager'
@@ -118,7 +117,7 @@ declare const paramsBigwall: (() => void) | undefined
 
 export let camera: PerspectiveCamera
 export let scene: Scene
-export let renderer: LegacyWebGLRenderer
+export let renderer: WebGLRenderer
 
 // global flag that can be set true to render
 shared.renderNeeded = true
@@ -421,14 +420,13 @@ export function checkParams(): void {
   if (typeof paramsBigwall == 'function') paramsBigwall()
 }
 
-export function initTHREE(width: number, height: number): LegacyWebGLRenderer {
+export function initTHREE(width: number, height: number): WebGLRenderer {
   camera = new PerspectiveCamera(30, width / height, 1, 100000)
   scene = new Scene()
 
-  // `LegacyWebGLRenderer` is the npm renderer with the legacy no-argument
-  // `getSize()` restored (see `src/legacy/threeLegacyCompat.ts`): `onWindowResize`
-  // calls it without a target, exactly like `js/main.js` did.
-  renderer = new LegacyWebGLRenderer({
+  // three's `getSize(target)` writes into the target it is given, so
+  // `onWindowResize` passes one (see below).
+  renderer = new WebGLRenderer({
     logarithmicDepthBuffer: true,
     // alpha: true
     //antialias:true
@@ -468,8 +466,7 @@ export function onWindowResize(event: Event): void {
     app.editorPanel.xp_container.style.width = shared.windowWidth + 'px'
   }
 
-  // three's current `getSize(target)` needs a target; the legacy renderer fills
-  // and returns the vector it is given, so this is the original call
+  // three's `getSize(target)` writes into the target it is given
   const r = new Vector2()
   renderer.getSize(r)
   shared.rendererWidth = r.width

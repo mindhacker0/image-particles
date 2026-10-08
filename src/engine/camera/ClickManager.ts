@@ -1,10 +1,15 @@
 import Hammer from 'hammerjs'
-import { NearestFilter, WebGLRenderTarget, type PerspectiveCamera, type Scene } from 'three'
+import {
+  NearestFilter,
+  WebGLRenderTarget,
+  type PerspectiveCamera,
+  type Scene,
+  type WebGLRenderer,
+} from 'three'
 import type { Asset } from '../atlas/Asset'
 import type { Atlas } from '../atlas/Atlas'
 import type { MetadataAsset } from '../atlas/Metadatas'
 import { tsneSphere } from '../atlas/TsneSphere'
-import type { LegacyWebGLRenderer } from '../../legacy/threeLegacyCompat'
 
 /**
  * Ported from `js/camera/clickManager.js`.
@@ -84,8 +89,8 @@ interface ClickApp {
  * ------------------------------------------------------------------------- */
 
 /** `renderer` — created by `initTHREE` in `src/engine/Main.ts`. */
-function renderer(): LegacyWebGLRenderer {
-  return (window as unknown as { renderer: LegacyWebGLRenderer }).renderer
+function renderer(): WebGLRenderer {
+  return (window as unknown as { renderer: WebGLRenderer }).renderer
 }
 
 /** `scene` — created by `initTHREE` in `src/engine/Main.ts`. */

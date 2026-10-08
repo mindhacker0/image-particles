@@ -190,9 +190,6 @@ export const introItem: IntroItem = (function (exports: IntroItem) {
     texture.needsUpdate = true
 
     // create the material
-    // (the original stored the renderer size in an unused variable here: the call
-    // is kept so the module reads the same global at the same moment)
-    legacyRenderer().getSize()
     return new ShaderMaterial({
       uniforms: {
         map: { type: 't', value: texture },
@@ -318,9 +315,4 @@ void main(){
  */
 function atlasMdLabels(): MetadataLabel[] {
   return (atlasInstance() as unknown as { mdLabels: { labels: MetadataLabel[] } }).mdLabels.labels
-}
-
-/** legacy global owned by `js/main.js` (the render loop) */
-function legacyRenderer(): { getSize(): { width: number; height: number } } {
-  return (window as unknown as { renderer: { getSize(): { width: number; height: number } } }).renderer
 }
