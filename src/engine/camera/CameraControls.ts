@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import { OrbitControls as OrbitControlsImpl } from 'three/examples/jsm/controls/OrbitControls.js'
 import { TrackballControls as TrackballControlsImpl } from 'three/examples/jsm/controls/TrackballControls.js'
 import Hammer from 'hammerjs'
-import { TweenLite, legacyEases } from '../../legacy/gsapLegacy'
+import { gsap } from 'gsap'
 import {
   disableUI as mainDisableUI,
   enableUI as mainEnableUI,
@@ -25,7 +25,7 @@ import { tsneControls } from './controls/TsneControls'
  * `TrackballControls` pair, the shared `target` object, the state machine
  * (visualizers / timeline / curator / machine learning modes), the Hammer and
  * wheel listeners, the deep-link url (de)serialisation and the camera / target
- * tweens driven by TweenLite.
+ * tweens driven by gsap.
  *
  * The original was a classic script: an IIFE returning its own `exports`
  * object, prefixed by a few module globals (`PI`, `PI2`, `RAD`, `DEG`, `hasNan`,
@@ -38,9 +38,8 @@ import { tsneControls } from './controls/TsneControls'
  *   shared copies). They now live in `../utils/math`; this file only still uses
  *   `lerp`. The other module constants (`PI`, `PI2`, `RAD`, `DEG`, `hasNan`, `cc`)
  *   are exported for the other camera modules.
- * - `TweenLite` and the `Expo` / `Cubic` eases come from the GSAP 2 facade
- *   (`../../legacy/gsapLegacy`), whose `to(target, duration, vars)` signature
- *   matches the original calls.
+ * - the tweens use `gsap` directly; the legacy ease objects (`Expo.easeOut`,
+ *   `Cubic.easeInOut`, ...) became GSAP 3 ease strings (`'expo.out'`, ...).
  * - `OrbitControls`, `TrackballControls` and `Hammer` are imported from their
  *   npm packages, like the geometry / material / vector classes.
  * - `renderNeeded = true` is written through `markRenderNeeded()`.
@@ -559,7 +558,7 @@ export const cameraControls: CameraControls = (function (exports: CameraControls
     selectedAsset = null
     controls.selectAsset(null)
 
-    TweenLite.killTweensOf(orbitControls)
+    gsap.killTweensOf(orbitControls)
     atlasApi().setFogDistance(50000)
 
     //reset controls
@@ -606,7 +605,8 @@ export const cameraControls: CameraControls = (function (exports: CameraControls
 
     //removes the wave animation
     for (const mesh of atlasApi().meshes) {
-      TweenLite.to(mesh.material.material.uniforms.wavesAmp, 2, {
+      gsap.to(mesh.material.material.uniforms.wavesAmp, {
+        duration: 2,
         value: 0,
         onUpdate: function () {
           markRenderNeeded()
@@ -901,19 +901,20 @@ export const cameraControls: CameraControls = (function (exports: CameraControls
     onUpdate?: (() => void) | null,
     ease?: unknown,
   ) {
-    //TweenLite.killTweensOf(camera.position);
+    //gsap.killTweensOf(camera.position);
 
     exports.lockUI()
     pos = pos || ZERO
     exports.tweening = true
     const cam = camera()
-    TweenLite.killTweensOf(cam.position)
-    TweenLite.to(cam.position, isNaN(duration as number) ? 1 : (duration as number), {
+    gsap.killTweensOf(cam.position)
+    gsap.to(cam.position, {
+      duration: isNaN(duration as number) ? 1 : (duration as number),
       x: pos.x,
       y: pos.y,
       z: pos.z,
       overwrite: true,
-      ease: ease || legacyEases.Expo.easeOut,
+      ease: (ease as string) || 'expo.out',
       onUpdate: function () {
         if (onUpdate) onUpdate()
         controls.constrain()
@@ -941,13 +942,14 @@ export const cameraControls: CameraControls = (function (exports: CameraControls
     exports.lockUI()
     pos = pos || ZERO
     exports.tweening = true
-    TweenLite.killTweensOf(target.position)
-    TweenLite.to(target.position, isNaN(duration as number) ? 1 : (duration as number), {
+    gsap.killTweensOf(target.position)
+    gsap.to(target.position, {
+      duration: isNaN(duration as number) ? 1 : (duration as number),
       x: pos.x,
       y: pos.y,
       z: pos.z,
       overwrite: true,
-      ease: ease || legacyEases.Expo.easeOut,
+      ease: (ease as string) || 'expo.out',
       onUpdate: function () {
         if (onUpdate) onUpdate()
         controls.constrain()
@@ -1097,9 +1099,9 @@ export const cameraControls: CameraControls = (function (exports: CameraControls
       pos.y = tsneControls.getYOffset(pos)
     }
 
-    //TweenLite.killTweensOf(target.position);
-    //TweenLite.killTweensOf(camera.position);
-    //TweenLite.killTweensOf(exports);
+    //gsap.killTweensOf(target.position);
+    //gsap.killTweensOf(camera.position);
+    //gsap.killTweensOf(exports);
 
     cameraOrigin.copy(cam.position)
     targetOrigin.copy(target.position)
@@ -1112,9 +1114,10 @@ export const cameraControls: CameraControls = (function (exports: CameraControls
 
     if (typeof delay == 'undefined') delay = 0
 
-    TweenLite.to(exports, isNaN(duration as number) ? 1.5 : (duration as number), {
+    gsap.to(exports, {
+      duration: isNaN(duration as number) ? 1.5 : (duration as number),
       time: 1,
-      ease: ease || legacyEases.Cubic.easeInOut,
+      ease: (ease as string) || 'cubic.inOut',
       delay: delay,
       onUpdate: function () {
         cam.position.x = lerp(exports.time, cameraOrigin.x, pos.x)

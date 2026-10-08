@@ -9,7 +9,7 @@ import {
   type Texture as ThreeTexture,
   type Vector2,
 } from 'three'
-import { TweenLite } from '../../legacy/gsapLegacy'
+import { gsap } from 'gsap'
 import { Model } from '../data/Models'
 import { shared } from '../Main'
 import { atlasInstance, legacyApp, legacyCamera, markRenderNeeded } from '../legacyScope'
@@ -30,7 +30,7 @@ import type { Asset } from './Asset'
  *
  * Notes on the non-obvious parts:
  * - Everything the original reached for through a global is now an import
- *   (`lod`, `LODMetadatas`, `Texture`, `Mesh`, `JSONLoader`, `Model`, `TweenLite`,
+ *   (`lod`, `LODMetadatas`, `Texture`, `Mesh`, `JSONLoader`, `Model`, `gsap`,
  *   `dateLabels`). The module only reads the `atlas` global itself for
  *   `datesMaterial` (assigned by `js/atlas/dateLabels.js`) plus the render loop
  *   globals owned by `js/main.js` (`rendererWidth`, `rendererHeight`) and `app`.
@@ -486,7 +486,8 @@ export class Atlas {
       }
     } else {
       for (const mesh of this.meshes) {
-        TweenLite.to(mesh.material.material.uniforms.fogDistance, duration, {
+        gsap.to(mesh.material.material.uniforms.fogDistance, {
+          duration,
           value: value,
           onUpdate: function () {
             markRenderNeeded()
@@ -497,7 +498,7 @@ export class Atlas {
 
     //dates' labels fog
     if (legacyAtlas().datesMaterial) {
-      TweenLite.to(legacyAtlas().datesMaterial.uniforms.fogDistance, duration, { value: value })
+      gsap.to(legacyAtlas().datesMaterial.uniforms.fogDistance, { duration, value: value })
     }
   }
 }

@@ -13,7 +13,7 @@ import { lod } from '../../atlas/lod/lod'
 import type { MetadataLabel } from '../../atlas/Metadatas'
 import { getUrlsDict } from '../../atlas/utils'
 import { atlasInstance, legacyCamera, legacyScene, markRenderNeeded } from '../../legacyScope'
-import { TweenLite } from '../../../legacy/gsapLegacy'
+import { gsap } from 'gsap'
 
 /**
  *
@@ -30,7 +30,7 @@ import { TweenLite } from '../../../legacy/gsapLegacy'
  *   three converts GLSL1 shaders to GLSL3 on WebGL2, where `texture2D` maps onto
  *   the built-in `texture()` function, so a uniform named `texture` would break
  *   the compile (black canvas). The original already used `map`; do not change it
- * - `getUrlsDict`, `lod` and `TweenLite` are imported from their already ported
+ * - `getUrlsDict`, `lod` and `gsap` are imported from their already ported
  *   modules; the still classic globals (`scene`, `camera`, `renderer`,
  *   `renderNeeded`, `atlas`, `window.URL`) are read through small getters at the
  *   end of this file or through `src/engine/legacyScope.ts`
@@ -130,7 +130,7 @@ export const introItem: IntroItem = (function (exports: IntroItem) {
   exports.start = function (duration) {
     if (!exports.ready) return
     material.uniforms.opacity.value = 0
-    TweenLite.to(material.uniforms.opacity, duration || 1, { value: 1 })
+    gsap.to(material.uniforms.opacity, { duration: duration || 1, value: 1 })
 
     // dispatch an event to update the metadata
     const assetsBySize: Record<string, string[]> = {}
@@ -144,7 +144,8 @@ export const introItem: IntroItem = (function (exports: IntroItem) {
     cancelAnimationFrame(interval)
     if (!exports.ready) return
 
-    TweenLite.to(material.uniforms.opacity, duration || 1, {
+    gsap.to(material.uniforms.opacity, {
+      duration: duration || 1,
       value: 0,
       onUpdate: function () {
         markRenderNeeded()

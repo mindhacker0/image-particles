@@ -73,7 +73,6 @@ src/
     partners/         partners grid (store, nodes, component, facade)
     sidecontent/      item detail panel and help/share/app dialogs
   legacy/             helpers shared by the engine
-    gsapLegacy.ts     GSAP 2 style `TweenLite` facade over npm gsap
     twixLegacy.ts     fetch based ajax helper
     loadLegacyEngine.ts   boots the engine once
 css/main.css          project stylesheet, bundled by Vite
@@ -121,14 +120,8 @@ path is still the argument, because that is what the callers pass.
 
 ## Compatibility layer
 
-`src/legacy/` holds the shims that let the engine keep its original expectations;
-no engine logic lives there:
+`src/legacy/` holds the helpers shared by the engine; no engine logic lives there:
 
-* `gsapLegacy.ts` restores the `TweenLite.to(target, duration, vars)` signature
-  over npm `gsap`, maps `alpha` → `opacity` for DOM targets (plain objects keep
-  their own `alpha`, e.g. shader uniforms), converts an object `transformOrigin`
-  and binds the `on*Scope` callbacks. The GSAP 2 ease objects (`Linear`, `Expo`,
-  `Back`, ...) are exported as `legacyEases` mapping to GSAP 3 ease strings.
 * `twixLegacy.ts` is the fetch based ajax helper the workers use.
 
 `three`, `hammerjs`, `gsap` and `twixLegacy` are imported directly by the modules

@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { TweenLite } from '../../../legacy/gsapLegacy'
+import { gsap } from 'gsap'
 import { cameraControls as engineCameraControls } from '../CameraControls'
 import { shared } from '../../Main'
 import { legacyCamera, legacyScene } from '../../legacyScope'
@@ -164,7 +164,7 @@ export const defaultControls: DefaultControls = (function (exports: DefaultContr
     trackball.enabled = false
     orbitControls.enabled = true
 
-    TweenLite.killTweensOf(orbitControls)
+    gsap.killTweensOf(orbitControls)
     switch (state) {
       case cameraControls().VISUALIZER_RANDOM:
       case cameraControls().VISUALIZER_SPHERE:
@@ -176,13 +176,14 @@ export const defaultControls: DefaultControls = (function (exports: DefaultContr
         cameraControls().targetGoto(ZERO, 1)
 
         if (state == cameraControls().VISUALIZER_SPHERE) {
-          TweenLite.to(trackball, 1, { minDistance: 4540 })
+          gsap.to(trackball, { duration: 1, minDistance: 4540 })
         }
 
         break
 
       case cameraControls().VISUALIZER_WAVES:
-        TweenLite.to(orbitControls, 10, {
+        gsap.to(orbitControls, {
+          duration: 10,
           minDistance: 1000,
           minPolarAngle: PI * 0.5 - RAD * 30,
           maxPolarAngle: PI * 0.5,
@@ -194,7 +195,7 @@ export const defaultControls: DefaultControls = (function (exports: DefaultContr
         orbitControls.maxPolarAngle = PI * 0.5 - RAD * 5
         orbitControls.maxDistance = 10000
 
-        // TweenLite.to( orbitControls, 2, {
+        // gsap.to( orbitControls, 2, {
         //     minPolarAngle:RAD * 5,
         //     maxPolarAngle:PI * .5 - RAD * 5,
         //     maxDistance: 10000

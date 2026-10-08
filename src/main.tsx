@@ -9,7 +9,6 @@ import App from './App'
  * Application bootstrap.
  *
  * Engine wiring lives in `src/legacy/`:
- *   gsapLegacy.ts       GSAP 2 style `TweenLite` facade over npm gsap
  *   twixLegacy.ts       fetch based ajax helper
  *   loadLegacyEngine.ts sequential, once-only loader
  */

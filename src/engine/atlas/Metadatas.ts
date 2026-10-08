@@ -8,7 +8,7 @@ import {
   type ShaderMaterial,
   type Vector3,
 } from 'three'
-import { TweenLite } from '../../legacy/gsapLegacy'
+import { gsap } from 'gsap'
 import { cameraControls } from '../camera/CameraControls'
 import { getItem } from '../data/Models'
 import { app, shared } from '../Main'
@@ -653,8 +653,9 @@ export class MetadataLabel extends Mesh {
 
   fadeIn(): void {
     this.isOut = false
-    TweenLite.killTweensOf(this.material.uniforms.alpha)
-    TweenLite.to(this.material.uniforms.alpha, 0.6, {
+    gsap.killTweensOf(this.material.uniforms.alpha)
+    gsap.to(this.material.uniforms.alpha, {
+      duration: 0.6,
       value: 1,
     })
   }
@@ -664,12 +665,11 @@ export class MetadataLabel extends Mesh {
     // `onFadeOutComplete`), so `LODMetadatas.update()` disposes the label on the
     // next frame and the 0.6s fade-out tween never plays.
     this.isOut = true
-    TweenLite.killTweensOf(this.material.uniforms.alpha)
-    TweenLite.to(this.material.uniforms.alpha, 0.6, {
+    gsap.killTweensOf(this.material.uniforms.alpha)
+    gsap.to(this.material.uniforms.alpha, {
+      duration: 0.6,
       value: 0,
-      onComplete: this.onFadeOutComplete,
-      // GSAP 2 syntax: the legacy facade binds the callback to this scope
-      onCompleteScope: this,
+      onComplete: () => this.onFadeOutComplete(),
     })
   }
 
@@ -753,7 +753,7 @@ export class MetadataLabel extends Mesh {
   }
 
   dispose(): void {
-    TweenLite.killTweensOf(this.material.uniforms.alpha)
+    gsap.killTweensOf(this.material.uniforms.alpha)
 
     const mat = this.material
 

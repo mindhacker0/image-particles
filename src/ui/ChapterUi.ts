@@ -1,4 +1,4 @@
-import { TweenLite, legacyEases } from '../legacy/gsapLegacy'
+import { gsap } from 'gsap'
 import { createCookie, readCookie } from '../engine/utils/functions'
 import { legacyApp, legacyCameraControls, legacyParams } from '../engine/legacyScope'
 import { setUiController } from './controller'
@@ -143,12 +143,12 @@ export class ChapterUi {
   }
 
   onRotationToogleEnter(): void {
-    TweenLite.killDelayedCallsTo(this.showRotationToolTip)
-    TweenLite.delayedCall(0.25, this.showRotationToolTip, [], this)
+    gsap.killTweensOf(this.showRotationToolTip)
+    gsap.delayedCall(0.25, this.showRotationToolTip)
   }
 
   onRotationToogleLeave(): void {
-    TweenLite.killDelayedCallsTo(this.showRotationToolTip)
+    gsap.killTweensOf(this.showRotationToolTip)
   }
 
   onRotationToogleClick(event?: SyntheticOrDomEvent): void {
@@ -211,40 +211,39 @@ export class ChapterUi {
 
     this.helpRunning = true
 
-    TweenLite.set(this.hstooltips, {
+    gsap.set(this.hstooltips, {
       autoAlpha: 0,
       scale: 0.7,
-      transformOrigin: { left: 0, top: '50%' },
+      transformOrigin: '0% 50%',
     })
-    TweenLite.set(this.hsmouse, { autoAlpha: 0, scale: 0.7 })
-    TweenLite.set(this.hsartwork, { autoAlpha: 0, scale: 0.7 })
-    TweenLite.set(this.hsmousewheel, { autoAlpha: 0, scale: 0.5 })
+    gsap.set(this.hsmouse, { autoAlpha: 0, scale: 0.7 })
+    gsap.set(this.hsartwork, { autoAlpha: 0, scale: 0.7 })
+    gsap.set(this.hsmousewheel, { autoAlpha: 0, scale: 0.5 })
 
     const readyTime = 4
     const timeShow = 0.35
     const timeHide = 0.2
-    const easeShow = legacyEases.Back.easeOut
-    const easeHide = legacyEases.Back.easeIn
-    const centerOrigin = { left: 0, top: '50%' }
+    const easeShow = 'back.out'
+    const easeHide = 'back.in'
+    const centerOrigin = '0% 50%'
 
     this.helpStartAnimated = true
 
     let current = wait
-    // arrow scope because the tween callbacks are invoked with `this` bound to
-    // the tween vars object by the GSAP facade
-    const scope = this
 
-    TweenLite.to(this.hscontainer, 0.8, { autoAlpha: 1, delay: current })
+    gsap.to(this.hscontainer, { duration: 0.8, autoAlpha: 1, delay: current })
 
     // step 1
     current += 0.5
-    TweenLite.to(this.hsmouse, timeShow, {
+    gsap.to(this.hsmouse, {
+      duration: timeShow,
       autoAlpha: 1,
       scale: 1,
       ease: easeShow,
       delay: current,
     })
-    TweenLite.to(this.hstooltips[0], timeShow, {
+    gsap.to(this.hstooltips[0], {
+      duration: timeShow,
       autoAlpha: 1,
       scale: 1,
       ease: easeShow,
@@ -255,21 +254,22 @@ export class ChapterUi {
 
     current += readyTime
 
-    TweenLite.to(this.hstooltips[0], timeHide, { autoAlpha: 0, delay: current })
+    gsap.to(this.hstooltips[0], { duration: timeHide, autoAlpha: 0, delay: current })
 
     // step 2
     current += 0.3
-    TweenLite.to(this.hsmousewheel, timeShow, {
+    gsap.to(this.hsmousewheel, {
+      duration: timeShow,
       autoAlpha: 1,
       scale: 1,
       ease: easeShow,
       delay: current,
-      onStartScope: this,
-      onStart() {
-        scope.helpStartAnimated = false
+      onStart: () => {
+        this.helpStartAnimated = false
       },
     })
-    TweenLite.to(this.hstooltips[1], 0.2, {
+    gsap.to(this.hstooltips[1], {
+      duration: 0.2,
       autoAlpha: 1,
       scale: 1,
       ease: easeShow,
@@ -279,14 +279,16 @@ export class ChapterUi {
 
     current += readyTime
 
-    TweenLite.to(this.hstooltips[1], timeHide, { autoAlpha: 0, delay: current })
-    TweenLite.to(this.hsmouse, 0.3, {
+    gsap.to(this.hstooltips[1], { duration: timeHide, autoAlpha: 0, delay: current })
+    gsap.to(this.hsmouse, {
+      duration: 0.3,
       autoAlpha: 0,
       scale: 0.7,
       ease: easeHide,
       delay: current,
     })
-    TweenLite.to(this.hsmousewheel, 0.2, {
+    gsap.to(this.hsmousewheel, {
+      duration: 0.2,
       autoAlpha: 0,
       scale: 0.7,
       ease: easeHide,
@@ -296,13 +298,15 @@ export class ChapterUi {
     // step 3
     current += 0.5
 
-    TweenLite.to(this.hsartwork, timeShow, {
+    gsap.to(this.hsartwork, {
+      duration: timeShow,
       autoAlpha: 1,
       scale: 1,
       ease: easeShow,
       delay: current,
     })
-    TweenLite.to(this.hstooltips[2], timeShow, {
+    gsap.to(this.hstooltips[2], {
+      duration: timeShow,
       autoAlpha: 1,
       scale: 1,
       ease: easeShow,
@@ -312,24 +316,25 @@ export class ChapterUi {
 
     current += readyTime + 0.5
 
-    TweenLite.to(this.hsartwork, 0.3, {
+    gsap.to(this.hsartwork, {
+      duration: 0.3,
       autoAlpha: 0,
       scale: 0.7,
       ease: easeHide,
       delay: current,
     })
-    TweenLite.to(this.hstooltips[2], timeHide, { autoAlpha: 0, delay: current })
+    gsap.to(this.hstooltips[2], { duration: timeHide, autoAlpha: 0, delay: current })
 
     current += 0.1
 
     this.onHsContainerClick = this.onHelpStartClick.bind(this)
     this.hscontainer?.addEventListener('click', this.onHsContainerClick, false)
 
-    TweenLite.to(this.hscontainer, 0.6, {
+    gsap.to(this.hscontainer, {
+      duration: 0.6,
       autoAlpha: 0,
       delay: current,
-      onComplete: this.onCompleteHelpStart,
-      onCompleteScope: this,
+      onComplete: () => this.onCompleteHelpStart(),
     })
 
     // got it for 100 days
@@ -341,22 +346,21 @@ export class ChapterUi {
 
   loopClickPath(opacity: number): void {
     if (this.helpStartAnimated || opacity === 1) {
-      TweenLite.to(this.clickPath, 0.7, {
+      gsap.to(this.clickPath, {
+        duration: 0.7,
         fillOpacity: opacity,
-        onComplete: this.loopClickPath,
-        onCompleteScope: this,
-        onCompleteParams: [opacity === 0.5 ? 1 : 0.5],
+        onComplete: () => this.loopClickPath(opacity === 0.5 ? 1 : 0.5),
       })
     }
   }
 
   onCompleteHelpStart(): void {
-    TweenLite.killTweensOf(this.hscontainer)
-    TweenLite.killTweensOf(this.hsartwork)
-    TweenLite.killTweensOf(this.hsmouse)
-    TweenLite.killTweensOf(this.hsmousewheel)
-    TweenLite.killTweensOf(this.clickPath)
-    this.hstooltips.forEach((tooltip) => TweenLite.killTweensOf(tooltip))
+    gsap.killTweensOf(this.hscontainer)
+    gsap.killTweensOf(this.hsartwork)
+    gsap.killTweensOf(this.hsmouse)
+    gsap.killTweensOf(this.hsmousewheel)
+    gsap.killTweensOf(this.clickPath)
+    this.hstooltips.forEach((tooltip) => gsap.killTweensOf(tooltip))
 
     this.helpRunning = false
     this.helpStartAnimated = false
@@ -365,7 +369,7 @@ export class ChapterUi {
       this.hscontainer?.removeEventListener('click', this.onHsContainerClick, false)
     }
 
-    TweenLite.to(this.hscontainer, 0.6, { autoAlpha: 0 })
+    gsap.to(this.hscontainer, { duration: 0.6, autoAlpha: 0 })
   }
 
   onHelpStartClick(): void {

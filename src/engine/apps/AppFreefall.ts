@@ -1,5 +1,5 @@
 import { Color, Vector3, type Object3D, type PerspectiveCamera } from 'three'
-import { TweenLite, legacyEases } from '../../legacy/gsapLegacy'
+import { gsap } from 'gsap'
 import { ChapterUi } from '../../ui/ChapterUi'
 import type { Asset } from '../atlas/Asset'
 import type { Atlas } from '../atlas/Atlas'
@@ -57,7 +57,7 @@ import { Sidect } from '../../ui/sidecontent/SideContentFacade'
  * - already ported modules replaced the globals of the same name: `ChapterUi`,
  *   `Atlas` (through `atlasInstance()`), `dateLabels`, `introItem`,
  *   `Timescroll`, `timelineControls`, the formulas, `getDates`, `getCurrentUrl`,
- *   `PRNG`, `legacyEases` (`Expo`), `markRenderNeeded` (`renderNeeded = true`)
+ *   `PRNG`, `gsap`, `markRenderNeeded` (`renderNeeded = true`)
  * - `bigbangFormula` (`js/atlas/formulas/bigbang_formula.js`), `Sidect`
  *   (`js/ui/sidect.js`), `enableUI` / `animate` / `setup` (`js/main.js`) and
  *   `cameraControls` (`js/camera/cameraControls.js`) are not ported yet: they are
@@ -445,7 +445,8 @@ export class App {
 
     //sets the waves motion amplitude
     atlas.meshes.forEach(function (mesh) {
-      TweenLite.to(mesh.material.material.uniforms['wavesAmp'], 4, {
+      gsap.to(mesh.material.material.uniforms['wavesAmp'], {
+        duration: 4,
         value: wavesAmp,
         onUpdate: function () {
           markRenderNeeded()
@@ -513,7 +514,7 @@ export class App {
           cameraControls.cameraGoto(new Vector3(camera.position.x, camera.position.y, 1000), 3)
         },
         null,
-        legacyEases.Expo.easeIn,
+        'expo.in',
       )
 
       //make the berekhat ram disappear
@@ -618,7 +619,8 @@ export class App {
 
     //sets the waves motion amplitude
     atlas.meshes.forEach(function (mesh) {
-      TweenLite.to(mesh.material.material.uniforms['wavesAmp'], 4, {
+      gsap.to(mesh.material.material.uniforms['wavesAmp'], {
+        duration: 4,
         value: 0,
         onUpdate: function () {
           markRenderNeeded()

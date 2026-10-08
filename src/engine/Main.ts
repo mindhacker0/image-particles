@@ -1,5 +1,5 @@
 import { Color, PerspectiveCamera, Scene, Vector2, WebGLRenderer } from 'three'
-import { TweenLite, legacyEases } from '../legacy/gsapLegacy'
+import { gsap } from 'gsap'
 import { Atlas } from './atlas/Atlas'
 import { lod } from './atlas/lod/lod'
 import { clickManager } from './camera/ClickManager'
@@ -228,9 +228,10 @@ export function appStart(): void {
 
   if (typeof app.initLoading !== 'undefined') app.initLoading()
 
-  TweenLite.to(document.querySelector('.main-preloader span'), 0.7, {
-    ease: legacyEases.Linear.easeNone,
-    alpha: 1,
+  gsap.to(document.querySelector('.main-preloader span'), {
+    duration: 0.7,
+    ease: 'none',
+    opacity: 1,
     delay: 1,
   })
 
@@ -276,7 +277,7 @@ export function onAtlasLoadComplete(pct?: number): void {
   clearInterval(shared.preloadInterval)
 
   //var preloader_el = document.querySelector('.main-preloader > p');
-  //TweenLite.to(preloader_el, 0.8, {alpha:0, ease:Linear.easeNone});
+  //gsap.to(preloader_el, 0.8, {alpha:0, ease:Linear.easeNone});
 
   // delay app launch so that the browser refreshes with latest infos before
   // the short freeze

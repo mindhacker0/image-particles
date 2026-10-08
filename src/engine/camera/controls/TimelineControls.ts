@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { TweenLite } from '../../../legacy/gsapLegacy'
+import { gsap } from 'gsap'
 import { cameraControls as engineCameraControls } from '../CameraControls'
 import { shared } from '../../Main'
 import { atlasInstance, legacyCamera, legacyParams } from '../../legacyScope'
@@ -179,14 +179,14 @@ export const timelineControls: TimelineControls = (function (exports: TimelineCo
     state = newState
     switch (newState) {
       case cameraControls().TIMELINE_3D:
-        // TweenLite.to( exports.axis, 1, { x:axis3D.x, y:axis3D.y, z:axis3D.z } );
+        // gsap.to( exports.axis, 1, { x:axis3D.x, y:axis3D.y, z:axis3D.z } );
         exports.axis = axis3D
 
         exports.axisDistance = Math.min(
           2500,
           legacyCamera().position.distanceTo(target.position),
         )
-        // TweenLite.to( exports, 1, { axisDistance : Math.min( 2500, camera.position.distanceTo( target.position ) ) } );
+        // gsap.to( exports, 1, { axisDistance : Math.min( 2500, camera.position.distanceTo( target.position ) ) } );
 
         dest = target.position
           .clone()
@@ -194,7 +194,7 @@ export const timelineControls: TimelineControls = (function (exports: TimelineCo
         cameraControls().cameraGoto(dest, motionDuration)
 
         atlasApi().setFogDistance(20000, motionDuration)
-        TweenLite.to(orbitControls, motionDuration, { maxDistance: 2500 })
+        gsap.to(orbitControls, { duration: motionDuration, maxDistance: 2500 })
 
         orbitControls.enableZoom = false
         dateLabels.hide(motionDuration)
@@ -204,7 +204,7 @@ export const timelineControls: TimelineControls = (function (exports: TimelineCo
       case cameraControls().TIMELINE_FLAT:
         orbitControls.enableZoom = true
 
-        // TweenLite.to( exports.axis, 1, { x:axis2D.x, y:axis2D.y, z:axis2D.z } );
+        // gsap.to( exports.axis, 1, { x:axis2D.x, y:axis2D.y, z:axis2D.z } );
         exports.axis = axis2D
 
         cameraControls().cameraGoto(
@@ -213,7 +213,7 @@ export const timelineControls: TimelineControls = (function (exports: TimelineCo
         )
 
         atlasApi().setFogDistance(50000, motionDuration)
-        TweenLite.to(orbitControls, motionDuration, { maxDistance: 10000 })
+        gsap.to(orbitControls, { duration: motionDuration, maxDistance: 10000 })
         dateLabels.show(motionDuration)
 
         break
@@ -228,7 +228,7 @@ export const timelineControls: TimelineControls = (function (exports: TimelineCo
         )
 
         // atlas.setFogDistance( 50000, 2 );
-        TweenLite.to(orbitControls, motionDuration, { maxDistance: 10000 })
+        gsap.to(orbitControls, { duration: motionDuration, maxDistance: 10000 })
 
         break
     }
@@ -239,7 +239,7 @@ export const timelineControls: TimelineControls = (function (exports: TimelineCo
 
   exports.setFirstLocation = function (timescroll: Timescroll, year?: number) {
     let duration = 3
-    TweenLite.to(exports, duration, { axisDistance: 2500 })
+    gsap.to(exports, { duration, axisDistance: 2500 })
 
     //starts at provided year
     const bounds = timescroll.getBoundingBoxByYear(year || 0)
@@ -457,7 +457,7 @@ export const timelineControls: TimelineControls = (function (exports: TimelineCo
 
   exports.selectAsset = function (asset: unknown) {
     selectedAsset = asset
-    if (asset) TweenLite.to(exports, 1, { axisDistance: orbitControls.minDistance })
+    if (asset) gsap.to(exports, { duration: 1, axisDistance: orbitControls.minDistance })
   }
 
   return exports

@@ -9,7 +9,7 @@ import {
   type ShaderMaterialParameters,
   type WebGLRenderer,
 } from 'three'
-import { TweenLite } from '../../legacy/gsapLegacy'
+import { gsap } from 'gsap'
 import { renderer } from '../Main'
 import { atlasInstance, legacyCamera, markRenderNeeded } from '../legacyScope'
 import { canvasUtils } from '../utils/canvas'
@@ -278,7 +278,8 @@ export const dateLabels: DateLabels = (function (exports: DateLabels) {
     mesh = new Mesh(geometry, material) as unknown as DateLabelsMesh
     mesh.show = function (duration?: number) {
       mesh.visible = true
-      TweenLite.to(material.uniforms.opacity, duration || 1, {
+      gsap.to(material.uniforms.opacity, {
+        duration: duration || 1,
         overwrite: true,
         value: 1,
         onUpdate: function () {
@@ -287,7 +288,8 @@ export const dateLabels: DateLabels = (function (exports: DateLabels) {
       })
     }
     mesh.hide = function (duration?: number) {
-      TweenLite.to(material.uniforms.opacity, duration || 1, {
+      gsap.to(material.uniforms.opacity, {
+        duration: duration || 1,
         value: 0,
         onUpdate: function () {
           markRenderNeeded()
@@ -319,12 +321,13 @@ export const dateLabels: DateLabels = (function (exports: DateLabels) {
     if (!ready) return
     mesh.visible = true
     material.uniforms.opacity.value = 0
-    TweenLite.to(material.uniforms.opacity, duration || 0, { value: 1 })
+    gsap.to(material.uniforms.opacity, { duration: duration || 0, value: 1 })
   }
 
   exports.hide = function (duration?: number): void {
     if (!ready) return
-    TweenLite.to(material.uniforms.opacity, duration || 0, {
+    gsap.to(material.uniforms.opacity, {
+      duration: duration || 0,
       value: 0,
       onComplete: function () {
         mesh.visible = false
