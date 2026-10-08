@@ -6,90 +6,52 @@ import { norm } from '../../utils/math'
 import Hammer from 'hammerjs'
 
 /**
- * Ported from `js/camera/controls/tsneControls.js`.
- *
- * Camera controls of the t-SNE visualizer: the target follows the pointer on
- * the height map (`shootTarget`), the camera drags the whole scene and the
- * wheel factor is adapted to the distance to the ground.
- *
- * The original was an IIFE returning its own `exports` object; the port keeps
- * every member, argument order and default value and is meant to be published
- * as the `tsneControls` global driven by `js/camera/cameraControls.js`.
- *
- * Port notes:
- * - `PI` / `RAD` are globals of the not-yet-ported `js/camera/cameraControls.js`
- *   declared with exactly these values: the local copies remove the load-order
- *   dependency on that file.
- * - `norm` used to be a global of that same file with the exact same body as
- *   `src/engine/utils/math.ts` -> imported from there.
- * - `Hammer` is imported from the npm `hammerjs` package.
- * - `lastMouse` is a `Vector2` but the original called `set(x, y, 0)` (a
- *   Vector3 shaped call): three ignores the extra argument, so it is dropped.
- * - `raycaster.ray.intersectPlane(plane)` lost its one argument form in r125,
- *   it now writes into a target vector: the port passes a module local scratch
- *   vector (the original three allocated one per call).
- * - `state` is only read by `mouseHandler` and never assigned: `setState()` of
- *   this module takes no argument, so `state == MACHINE_AUTO` is always false
- *   in the original as well (kept 1:1).
- * - Immutable globals of classic scripts (`cameraControls`, `camera`,
- *   `ImageTsneFormula`, `tsneMesh`, `lockLOD`, `mouseWheelDeltaFactor*`) are
- *   read / written at call time through the helpers below.
+ * t-SNE 可视化器的相机控制器。
+ * 目标点跟随指针在地形高度图上的位置（`shootTarget`），相机拖拽整个场景，
+ * 滚轮系数随到地面的距离变化。
  */
 
-/**
- * Declared by `js/camera/cameraControls.js` as `Math.PI` / `Math.PI / 180`.
- * Kept local so this module can be imported before that classic script runs.
- */
+/** 角度常量（本地定义，避免对引入顺序的依赖）。 */
 const PI = Math.PI
 const RAD = Math.PI / 180
 
 /* ------------------------------------------------------------------------- *
- * Legacy globals still owned by the classic scripts.
- * They are read at call time: they do not exist yet while this module is
- * evaluated / imported.
+ * 主模块共享状态。
+ * 它们在模块初始化时尚未就绪，只能在调用时惰性读取。
  * ------------------------------------------------------------------------- */
 
 /**
- * The t-SNE height map formula is read by `getGroundLevel` below but no file of
- * this snapshot defines it (the ported `js/data/models.js` writes it in
- * `getTsne`): the original build shipped a formula script that is missing here.
- * The declaration is ambient (no emitted code), so reaching it at runtime still
- * throws a ReferenceError exactly like the classic script.
+ * t-SNE 高度图公式未在本构建中定义，`getGroundLevel` 访问它会抛 ReferenceError。
  */
 declare const ImageTsneFormula: { getHeightAt(x: number, y: number): number }
 
 /**
- * `shootTarget` raycasts against `tsneMesh.mesh` but no file of this snapshot
- * defines `tsneMesh`: the sphere module publishes `tsneSphere`
- * (`src/engine/atlas/TsneSphere.ts`, ported from the now deleted
- * `js/atlas/tsneSphere.js`) and `js/camera/clickManager.js` uses the same stale
- * name in commented-out code, so `tsneSphere` is the likely intent. Kept as an
- * ambient declaration so the port does not silently start raycasting against a
- * different object than the classic script did.
+ * `shootTarget` 射线检测用的网格；本构建未定义该对象，
+ * 实际发布的是 `tsneSphere`，这里保留同名声明以免误改检测目标。
  */
 declare const tsneMesh: { mesh: THREE.Object3D }
 
-/** `lockLOD`, written by `update`. */
+/** 由 `update` 写入的 LOD 锁定状态。 */
 function setLockLOD(value: boolean): void {
   shared.lockLOD = value
 }
 
-/** `mouseWheelDeltaFactor_tsne_min`. */
+/** t-SNE 最小滚轮系数。 */
 function mouseWheelDeltaFactorTsneMin(): number {
   return shared.mouseWheelDeltaFactor_tsne_min
 }
 
-/** `mouseWheelDeltaFactor_tsne_max`. */
+/** t-SNE 最大滚轮系数。 */
 function mouseWheelDeltaFactorTsneMax(): number {
   return shared.mouseWheelDeltaFactor_tsne_max
 }
 
-/** `mouseWheelDeltaFactorOrbit`, written by `update`. */
+/** orbit 滚轮系数，由 `update` 写入。 */
 function setMouseWheelDeltaFactorOrbit(value: number): void {
   shared.mouseWheelDeltaFactorOrbit = value
 }
 
-/** The `this` of the patched Hammer mouse input (see `Hammer.MouseInput`). */
+/** 被改写的 Hammer 鼠标输入实例（`this` 的形态）。 */
 interface HammerMouseInput {
   pressed: boolean | number
   button: number | boolean
@@ -105,12 +67,10 @@ interface HammerMouseEvent {
 }
 
 /**
- * three's `OrbitControls` with the legacy `mouseButtons` key names.
+ * 使用旧版 `mouseButtons` 键名的 three `OrbitControls` 接口。
  *
- * NOTE: the npm `OrbitControls` (r150+) expects `{ LEFT, MIDDLE, RIGHT }` and
- * no longer reads `ORBIT` / `PAN`, which the original reads here (and
- * `js/camera/cameraControls.js` everywhere): the button mapping silently stops
- * working. Kept 1:1, the whole camera layer needs the same fix.
+ * 注意：npm 版 `OrbitControls`（r150+）使用 `{ LEFT, MIDDLE, RIGHT }`，
+ * 不再读取 `ORBIT` / `PAN`，下面的按键映射不会生效。
  */
 interface LegacyOrbitControls {
   enableZoom: boolean
@@ -125,7 +85,7 @@ interface LegacyOrbitControls {
   update(): boolean
 }
 
-/** `cameraControls` (`js/camera/cameraControls.js`) as this module uses it. */
+/** 本模块使用的 cameraControls 接口。 */
 interface TsneControlsContext {
   tweening: boolean
   orbitControls: LegacyOrbitControls
@@ -139,15 +99,14 @@ function cameraControls(): TsneControlsContext {
 }
 
 /**
- * Events handed to `mouseHandler`: the raw wheel event or a Hammer event with a
- * `center` (see `js/camera/cameraControls.js`).
+ * 传给 `mouseHandler` 的事件：原始滚轮事件，或带 `center` 的 Hammer 事件。
  */
 type TsneControlEvent = {
   type: string
   center: { x: number; y: number }
 }
 
-/** The `tsneControls` global consumed by `js/camera/cameraControls.js`. */
+/** 对外暴露的 tsneControls 对象。 */
 interface TsneControls {
   bind: boolean
   shoot: boolean
@@ -169,6 +128,7 @@ interface TsneControls {
 export const tsneControls: TsneControls = (function (exports: TsneControls) {
   let orbitControls: LegacyOrbitControls
   let target: THREE.Object3D
+  // 从未赋值，因此 state == MACHINE_AUTO 恒为 false。
   let state: number
   let ready = false
   let shiftDown: boolean
@@ -182,8 +142,7 @@ export const tsneControls: TsneControls = (function (exports: TsneControls) {
   const center = { x: 0, y: 0 }
   const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
   const raycaster = new THREE.Raycaster()
-  // r125+ writes the plane intersection into this target instead of returning a
-  // freshly allocated vector.
+  // r125+ 将平面交点写入该向量，而不再返回新分配的向量。
   const planeIntersection = new THREE.Vector3()
 
   const position = new THREE.Vector3()
@@ -211,22 +170,23 @@ export const tsneControls: TsneControls = (function (exports: TsneControls) {
   exports.locked = false
   //////////////////////////
 
+  /** 初始化：缓存共享对象，并改写 Hammer 的鼠标输入以支持右键。 */
   exports.init = function () {
     orbitControls = cameraControls().orbitControls
     target = cameraControls().target
 
-    //extend to allow right click
+    // 扩展以支持右键
 
-    //input mouse map is not a public property of Hammer, so copy it here
+    // Hammer 未公开该映射，这里手动复制
    
     const MOUSE_INPUT_MAP: Record<string, number> = {
       mousedown: Hammer.INPUT_START,
       mousemove: Hammer.INPUT_MOVE,
       mouseup: Hammer.INPUT_END,
     }
-    //override
-    // `@types/hammerjs` types `MouseInput` / `Input` as instances, while the
-    // runtime `inherit` expects the constructors they are at run time.
+    // 覆写
+    // `@types/hammerjs` 将 MouseInput / Input 类型化为实例，
+    // 而运行时 inherit 需要的是它们的构造函数。
     Hammer.inherit(
       Hammer.MouseInput as unknown as Function,
       Hammer.Input as unknown as Function,
@@ -234,10 +194,10 @@ export const tsneControls: TsneControls = (function (exports: TsneControls) {
         handler: function MEhandler(this: HammerMouseInput, ev: HammerMouseEvent) {
         let eventType = MOUSE_INPUT_MAP[ev.type]
 
-        //modified to handle all buttons
-        //left=0, middle=1, right=2
+        // 改写以处理所有按键
+        // 左=0，中=1，右=2
         if (eventType & Hammer.INPUT_START) {
-          //firefox sends button 0 for mousemove, so store it here
+          // Firefox 的 mousemove 会上报 button 0，这里暂存真实按键
           if (this.pressed === false) this.button = ev.button
           this.pressed = true
         }
@@ -245,7 +205,7 @@ export const tsneControls: TsneControls = (function (exports: TsneControls) {
         if (eventType & Hammer.INPUT_MOVE && ev.which === 0) {
           eventType = Hammer.INPUT_END
         }
-        // mouse must be down, and mouse events are allowed (see the TouchMouse input)
+        // 必须处于按下状态且允许鼠标事件
         if (!this.pressed || !this.allow) {
           return
         }
@@ -266,23 +226,26 @@ export const tsneControls: TsneControls = (function (exports: TsneControls) {
     })
   }
 
+  /** 返回目标点相对地面的高度。 */
   exports.getYOffset = function (pos?: THREE.Vector3, offset?: unknown): number {
     const p = pos || legacyCamera().position
     return Math.max(exports.getGroundLevel(p, offset), p.y)
   }
 
+  /** 返回地形高度图在指定位置的高度。 */
   exports.getGroundLevel = function (pos?: THREE.Vector3, offset?: unknown): number {
     const p = pos || legacyCamera().position
     const groundOffset = offset == null || Boolean(offset) ? 8 : 0
     return ImageTsneFormula.getHeightAt(p.x, p.z) + groundOffset
   }
 
+  /** 初始化状态：关闭旋转 / 平移 / 缩放并设定极角范围。 */
   exports.setState = function () {
     orbitControls.enableRotate = false
     orbitControls.enablePan = false
     orbitControls.enableZoom = false
 
-    orbitControls.maxDistance = 35000 //15000
+    orbitControls.maxDistance = 35000
 
     orbitControls.minPolarAngle = PI * 0.5 - RAD * 85
     orbitControls.maxPolarAngle = PI * 0.5 - RAD * 5
@@ -290,6 +253,7 @@ export const tsneControls: TsneControls = (function (exports: TsneControls) {
     ready = true
   }
 
+  /** 同步 Shift 键状态；按下时触发一次目标重定位。 */
   exports.onShift = function (newState: boolean) {
     shiftDown = newState
     orbitControls.enableZoom = true
@@ -300,6 +264,7 @@ export const tsneControls: TsneControls = (function (exports: TsneControls) {
     }
   }
 
+  /** 处理滚轮与拖拽，驱动目标跟随指针。 */
   exports.mouseHandler = function (event: TsneControlEvent) {
     if (state == cameraControls().MACHINE_AUTO) return
     if (cameraControls().tweening) return
@@ -308,7 +273,7 @@ export const tsneControls: TsneControls = (function (exports: TsneControls) {
     switch (event.type) {
       case 'wheel':
       case 'mousewheel':
-        //TODO zoom sans orbit + bind to interface buttons
+        // TODO：不依赖 orbit 的缩放，并绑定到界面按钮
         if (exports.shoot) shootTarget()
 
         break
@@ -335,16 +300,12 @@ export const tsneControls: TsneControls = (function (exports: TsneControls) {
         if (cameraControls().tweening) return
 
         if (shiftDown) {
-          //if( orbitControls.mouseButtons.ORBIT == e.button ){
           lastMouse.set(event.center.x, event.center.y)
           drag.set(0, 0, 0)
         }
 
-        //if( orbitControls.mouseButtons.PAN == e.button ){
         if (!shiftDown) {
-          //drag
-          //keep delta proportional to camera distance
-          // var n = norm( camera.position.distanceTo(target.position), orbitControls.minDistance, orbitControls.maxDistance  );
+          // 拖拽：使位移与相机距离成正比
           let n = norm(
             camera.position.y,
             exports.getGroundLevel(),
@@ -374,11 +335,10 @@ export const tsneControls: TsneControls = (function (exports: TsneControls) {
     }
   }
 
+  /** 从屏幕中心发射射线，把目标点投到地形或无限平面上。 */
   function shootTarget() {
     raycaster.setFromCamera(
-      // `center` is the plain `{ x, y }` object of the original: the middle of
-      // the screen (NDC 0, 0), which three's `setFromCamera` only reads x / y
-      // from. `legacyCamera()` only describes the members the ported atlas uses.
+      // center 是屏幕中心（NDC 0, 0），setFromCamera 只读取其中的 x / y。
       center as unknown as THREE.Vector2,
       legacyCamera() as unknown as THREE.Camera,
     )
@@ -386,29 +346,25 @@ export const tsneControls: TsneControls = (function (exports: TsneControls) {
 
     let ip = target.position
 
-    // var out = 'd: '+ camera.position.distanceTo( cameraControls.target.position ).toFixed( 0 ) +  ' ';
     if (meshHits.length) {
-      // on the mesh grid
+      // 命中网格
 
       ip = meshHits[0].point
-      // out += ( "mesh: " + camera.position.distanceTo( ip ).toFixed( 0 ) );
     } else {
-      // infinite plane
+      // 无限平面
 
       const planeHit = raycaster.ray.intersectPlane(plane, planeIntersection)
 
       if (planeHit != null) {
         if (ip.distanceTo(legacyCamera().position) < exports.shootDistance) {
           ip = planeHit
-          // out += ( "plane: " + camera.position.distanceTo( ip ).toFixed( 0 ) );
         }
       }
     }
     target.position.copy(ip)
-
-    // console.log( out );
   }
 
+  /** 每帧更新拖拽惯性、半径限制与滚轮系数。 */
   exports.update = function (): boolean | void {
     if (!ready) return false
     if (cameraControls().tweening) return false
@@ -419,7 +375,7 @@ export const tsneControls: TsneControls = (function (exports: TsneControls) {
 
     const camera = legacyCamera()
 
-    //drag
+    // 拖拽
     target.position.add(drag)
     camera.position.add(drag)
 
@@ -442,7 +398,7 @@ export const tsneControls: TsneControls = (function (exports: TsneControls) {
       drag.set(0, 0, 0)
     }
 
-    //recentrer target after 80° of max dist
+    // 超过最大距离 80° 后重新居中目标
     if (exports.recenter) {
       const d = camera.position.distanceTo(target.position)
       const n = norm(d, orbitControls.minDistance, orbitControls.maxDistance)
@@ -456,26 +412,23 @@ export const tsneControls: TsneControls = (function (exports: TsneControls) {
       let factor = (camera.position.y - 400) / 1500
       if (factor < 0) factor = 0
       else if (factor > 1) factor = 1
-      // ZOOM FACTOR ACCORDING TO THE DISTANCE TO TARGET
-      //mouseWheelDeltaFactorOrbit = mouseWheelDeltaFactor_tsne_min+n*(mouseWheelDeltaFactor_tsne_max-mouseWheelDeltaFactor_tsne_min);
+      // 按到目标的距离调整缩放系数
       setMouseWheelDeltaFactorOrbit(
         mouseWheelDeltaFactorTsneMin() +
           factor * (mouseWheelDeltaFactorTsneMax() - mouseWheelDeltaFactorTsneMin()),
       )
     }
 
-    // cameraControls.sp0.position.copy( target.position );
-
     return orbitControls.update()
   }
 
+  /** 约束钩子（当前为空实现）。 */
   exports.constrain = function () {
-    // exports.update();
   }
 
+  /** 记录选中的素材。 */
   exports.selectAsset = function (asset: unknown) {
     selectedAsset = asset
-    //app.shiftToggle.uncheck();
   }
 
   return exports

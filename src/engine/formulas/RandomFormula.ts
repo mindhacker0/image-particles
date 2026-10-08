@@ -2,6 +2,7 @@ import { Vector3 } from 'three'
 import { PRNG } from '../atlas/utils'
 import type { FormulaAsset } from '../legacyScope'
 
+/** 随机幅度（各轴最大值）。 */
 export interface RandomFormulaAmplitude {
   x: number
   y: number
@@ -10,6 +11,7 @@ export interface RandomFormulaAmplitude {
 
 export type RandomFormulaMode = 'polar' | 'cartesian'
 
+/** 随机布局公式：支持极坐标与直角坐标两种模式。 */
 export class RandomFormula {
   private readonly amp: RandomFormulaAmplitude
   private readonly hideOffset: number
@@ -24,7 +26,7 @@ export class RandomFormula {
   ) {
     this.amp = amp || { x: 4000, y: 4000, z: 2000 }
     this.hideOffset = hideOffset || 0
-    this.mode = mode || 'polar' // polar or cartesian
+    this.mode = mode || 'polar' // polar 或 cartesian
     this.isRelative = isRelative || false
   }
 
@@ -32,14 +34,14 @@ export class RandomFormula {
     const newPosition = new Vector3()
     const method = this.isRelative ? this.add : this.set
 
-    // resets the PRNG to get the same random sequence
+    // 重置 PRNG 以得到相同的随机序列
     PRNG.setSeed(0)
 
     switch (this.mode) {
       case 'polar': {
         for (let i = 0, l = assets.length; i < l; i++) {
           const asset = assets[i]
-          // samplings
+          // 采样
           const theta = Math.acos(PRNG.random() * 2 - 1)
           const phi = PRNG.random() * Math.PI * 2
           const radius = 1 - Math.sqrt(PRNG.random()) * this.amp.x
@@ -68,11 +70,13 @@ export class RandomFormula {
     }
   }
 
+  // 在当前位置上叠加随机偏移
   add(asset: FormulaAsset, coords: Vector3): void {
     coords.add(asset.position)
     asset.setPosition(coords.x, coords.y, coords.z)
   }
 
+  // 直接设置随机位置
   set(asset: FormulaAsset, coords: Vector3): void {
     asset.setPosition(coords.x, coords.y, coords.z)
   }

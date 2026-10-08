@@ -6,11 +6,11 @@ import { Material } from './Material'
 import type { Texture } from './Texture'
 
 /**
- *
- * Static atlas mesh: one instanced quad per asset of the texture. `MODMesh` and
- * the LOD meshes extend this class, so it stays a class with the same members.
+ * 静态图集网格：纹理中每个资产对应一个实例化四边形。
+ * `MODMesh` 与 LOD 网格都继承本类。
  */
 
+/** 累计创建的资产数量（诊断用）。 */
 let totalAssets = 0
 
 export class Mesh {
@@ -22,7 +22,7 @@ export class Mesh {
   material: Material
   mesh: ThreeMesh
 
-  // dictionary to retrieve assets by their ids
+  // 按 id 索引资产的字典
   assets: Record<string, Asset> = {}
 
   transitionPctSpeed = 0.01
@@ -43,7 +43,7 @@ export class Mesh {
   }
 
   setup(): void {
-    // normalize static coordinates
+    // 归一化静态坐标
     const norm = (this.texture.assetSize as number) / 16
 
     for (let i = 0, l = this.texture.coords.length; i < l; i++) {
@@ -53,8 +53,7 @@ export class Mesh {
       coords.w *= norm
       coords.h *= norm
 
-      //TODO(cdiagne@): cleaner handling of duplicated assets in atlases
-      // this is a tempfix for TED
+      // 临时处理图集中重复的资产：已存在则跳过
       if (atlasInstance().getAsset(coords.id as string)) {
         continue
       }
@@ -66,7 +65,7 @@ export class Mesh {
       asset.mesh = this
       this.geometry.append(asset, coords)
 
-      // update our dictionary indexes
+      // 更新字典索引
       this.assets[asset.id] = asset
     }
 
@@ -95,9 +94,9 @@ export class Mesh {
     this.updateAnimation()
   }
 
-  // animation is done on the gpu
-  // all items have a "position" and "destination" attribute
-  // "transitionPct" defines the percentage between these 2 position
+  // 动画在 GPU 上完成：
+  // 每个项都有 "position" 与 "destination" 两组 attribute，
+  // "transitionPct" 表示两者之间的插值比例
   updateAnimation(): void {
     this.transitionPctSpeed += (0.03 - this.transitionPctSpeed) * 0.01
     this.transitionPct += (1 - this.transitionPct) * this.transitionPctSpeed

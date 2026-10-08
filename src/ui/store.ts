@@ -1,24 +1,23 @@
 import { useSyncExternalStore } from 'react'
 
 /**
- * UI state of the React shell.
+ * React 外壳的 UI 状态。
  */
 
-
 export interface UiState {
-  /** header visibility (`.cilex-header.show`) */
+  /** 头部是否可见 */
   headerVisible: boolean
-  /** nav lists opened (`.nav.opened`) */
+  /** 导航列表是否已展开 */
   navsOpened: boolean
-  /** sequence highlighted in the nav */
+  /** 当前高亮的序列 */
   selectedSeq: string | null
-  /** the small "reopen" button shown after the user closed a trivia */
+  /** 关闭说明后展示的重新打开按钮 */
   triviaReupOpened: boolean
-  /** footer map menu (3D/2D toggle) visibility */
+  /** 底部地图菜单是否显示 */
   footerMapNavShown: boolean
-  /** 3D/2D toggle state (`.space-toggle.threed`) */
+  /** 3D/2D 切换状态 */
   threeD: boolean
-  /** loading spinner in the header (`.search-preloader.is-active`) */
+  /** 头部加载中状态 */
   loading: boolean
 }
 
@@ -40,6 +39,7 @@ export function getUiState(): UiState {
   return state
 }
 
+/** 订阅状态变化，返回取消订阅函数（供 `useSyncExternalStore` 使用）。 */
 export function subscribeUi(listener: () => void): () => void {
   listeners.add(listener)
   return () => {
@@ -47,12 +47,13 @@ export function subscribeUi(listener: () => void): () => void {
   }
 }
 
+/** 合并更新状态并通知所有订阅者。 */
 export function setUiState(patch: Partial<UiState>): void {
   state = { ...state, ...patch }
   listeners.forEach((listener) => listener())
 }
 
-/** React hook used by the UI components. */
+/** 供 UI 组件使用的 React Hook。 */
 export function useUiState(): UiState {
   return useSyncExternalStore(subscribeUi, getUiState, getUiState)
 }

@@ -2,13 +2,12 @@ import { Color, Vector3 } from 'three'
 import type { FormulaAsset } from '../legacyScope'
 import { map } from '../utils/math'
 
-//min XYZ, max XYZ, block count ( 100 * 100 * 100 ), squared block count
+// 空间网格参数：最小 XYZ、最大 XYZ、分块数
 export const S = 1000
 
-// The legacy code passed a fourth argument (the squared block count) which
-// Vector3 ignores, so it is dropped here.
 export const gridSize = new Vector3(-10000, 10000, S)
 
+/** 拾取颜色用的递增 id。 */
 let uidColor = 1
 
 export interface AssetCoords {
@@ -19,6 +18,7 @@ export interface AssetCoords {
   id?: string
 }
 
+/** `Asset` 构造参数。 */
 export interface AssetOptions {
   id: string
   coords: AssetCoords
@@ -31,6 +31,10 @@ interface AssetMesh {
   }
 }
 
+/**
+ * 图集中的一个资产：持有坐标、位置、颜色等状态。
+ * 位置 / 颜色 / 补间通过 setter 写入并标记对应的更新标志。
+ */
 export class Asset implements FormulaAsset {
   readonly _uid: number
   readonly id: string
@@ -40,7 +44,7 @@ export class Asset implements FormulaAsset {
   mesh: AssetMesh | undefined
   positionInbuffer = -1
 
-  // LOD
+  // LOD 相关状态
   lod = -1
   cameraDistance = 0
   image_url: string | null = null
@@ -125,7 +129,7 @@ export class Asset implements FormulaAsset {
   }
 }
 
-/** Current picking id counter, exposed for diagnostics. */
+/** 当前的拾取 id 计数，供诊断使用。 */
 export function peekUidColor(): number {
   return uidColor
 }

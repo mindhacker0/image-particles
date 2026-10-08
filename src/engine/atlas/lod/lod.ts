@@ -9,15 +9,11 @@ import { LODItem } from './LODItem'
 import type { LODAssetLike } from './types'
 
 /**
- *
- * Utility that loads higher resolution images (through the LODMesh class) for
- * the artworks that are nearby (through `getOnScreen` / `collectGridItems`).
- *
- * The original built its public surface with an IIFE writing onto `exports`; the
- * port keeps the same shape as a single `lod` object with module level state.
+ * 为附近的艺术作品（通过 `getOnScreen` / `collectGridItems` 筛选）加载更高分辨率的图像，
+ * 实际解码由 LODMesh 类完成。
  */
 
-/** An atlas asset plus the members the LOD grid queries need. */
+/** 图集资产，额外包含 LOD 网格查询所需的成员。 */
 interface GridAsset extends LODAssetLike {
   grid: { x: number; y: number; z: number }
   cameraDistance: number
@@ -61,30 +57,30 @@ let tmpAsset: GridAsset | null = null
 let tmpCallback: (() => void) | null = null
 
 export const lod: LodExports = {
-  // the original created this dispatcher inside `init`
   events: new EventDispatcher(),
   minimumLODResolution: 0,
   minRange: 0,
   maxRange: 0,
 
   init(lodDescriptors, container3D, atlasMeshes, _debug) {
-    // creates a set of LODs
+    // 创建一组 LOD 层级
     let level = 0
     descriptors = lodDescriptors || [
       new LODDescriptor(level++, 1024, 1024, 200),
       new LODDescriptor(level++, 256, 1024, 200),
       new LODDescriptor(level++, 128, 2048, 2500),
+      // 第 4 个层级（64px 图块、最多 5000 个）当前未启用：
       // new LODDescriptor( level++,   64, 2048, 5000 )
     ]
 
     if (legacyParams().isBigWallVersion) {
-      // TODO bigWall params
+      // TODO：bigWall 版本参数
     }
 
-    // minimum resolution at which metadata can be displayed
+    // 可以显示元数据的最小分辨率
     lod.minimumLODResolution = descriptors[1].tileSize
 
-    // creates LODItems associated to the LOD Descriptors
+    // 为每个 LOD 描述符创建一个 LODItem
     lods = []
     let loaders = 0
     let maxTiles = 0
@@ -130,11 +126,11 @@ export const lod: LodExports = {
 
     ;(tmpAsset as GridAsset).hide()
 
-    // transfer object to update the metadata
+    // 构造按尺寸分组的对象，用于更新元数据
     const assetsBySize: Record<string, string[]> = {}
     assetsBySize[lods[0].tileSize] = [(tmpAsset as GridAsset).id]
 
-    // dispatch an event to update the metadata
+    // 派发事件以更新元数据
     lod.events.dispatch('update', { assets: assetsBySize })
 
     if (tmpCallback) tmpCallback()
@@ -152,13 +148,13 @@ export const lod: LodExports = {
     })
   },
 
-  /** Updates the LODItems with the assets visible on screen. */
+  /** 用当前屏幕上可见的资产更新各 LODItem。 */
   setFromCamera() {
     if (legacyCameraControls().tweening) return
     if (busy) return
     busy = true
 
-    // get a list of arrays of items that are currently on screen
+    // 获取当前屏幕上可见的资产列表
     const newItems = getOnScreen(legacyCamera() as never)
 
     if (newItems == null) {
@@ -166,9 +162,9 @@ export const lod: LodExports = {
       return
     }
 
-    // resets the items LODS
+    // 重置各项的 LOD
     if (currentItems) {
-      // resets previous list
+      // 重置上一帧列表
       lod.clear()
 
       newItems.forEach(function (asset) {
@@ -181,15 +177,15 @@ export const lod: LodExports = {
       currentItems = newItems
     }
 
-    // transfer object to update the metadata
+    // 构造按尺寸分组的对象，用于更新元数据
     const assetsBySize: Record<string, string[]> = {}
 
-    // updates the LODItems accordingly
+    // 按 LOD 逐个更新
     lods.forEach(function (lodItem, id) {
-      // call loadings, then mesh & texture updates
+      // 先触发加载，再更新网格与纹理
       lodItem.update(currentItems as GridAsset[])
 
-      // prepares an object to update the metadata
+      // 准备用于更新元数据的对象
       const maxRangeForLod = Math.pow(descriptors[id].range, 2)
 
       assetsBySize[lodItem.tileSize] = (lodItem.assets as GridAsset[])
@@ -201,10 +197,10 @@ export const lod: LodExports = {
         })
     })
 
-    // dispatch an event to update the metadata
+    // 派发事件以更新元数据
     lod.events.dispatch('update', { assets: assetsBySize })
 
-    // sets the new URL
+    // 更新地址栏 URL
     legacyCameraControls().toUrl()
 
     busy = false
@@ -235,10 +231,10 @@ export const lod: LodExports = {
 }
 
 /**
- * Collects assets in the vicinity of a 3D position.
+ * 收集某个 3D 位置附近的资产。
  *
- * @param position the position to check
- * @param results an array that will contain the nearest assets to the position
+ * @param position 需要检查的位置
+ * @param results 用于存放该位置附近资产的数组
  */
 function collectGridItems(position: { x: number; y: number; z: number }, results: GridAsset[]): GridAsset[] {
   const offset = 50
@@ -275,11 +271,11 @@ function collectGridItems(position: { x: number; y: number; z: number }, results
   return results
 }
 
-// collects items that are offscreen by max 25%
+// 允许多收集屏幕外最多 25% 的项
 const bound = 1.25
 const vertex = new Vector3()
 const frontVec = new Vector3(0, 0, 1)
-// three's `getWorldQuaternion(target)` writes into the target it is given.
+// three 的 `getWorldQuaternion(target)` 会写入传入的 target。
 const worldQuaternion = new Quaternion()
 
 function getOnScreen(camera: {
@@ -290,21 +286,21 @@ function getOnScreen(camera: {
   const results: GridAsset[] = []
 
   // 1
-  // broad phase: gathers the items in the vicinity of the camera and the target
+  // 粗筛：收集相机与目标附近的项
   collectGridItems(camera.position, results)
 
-  // nothing to process
+  // 没有需要处理的内容
   if (results.length === 0) return null
 
   // 2
-  // orientation & clipping
+  // 朝向与裁剪
 
-  // retrieve camera's forward vector
+  // 获取相机的前向向量
   const output: GridAsset[] = []
   frontVec.set(0, 0, 1).applyQuaternion(camera.getWorldQuaternion(worldQuaternion))
 
   for (let i = 0; i < results.length; i++) {
-    // skip if vertex too close, too far or behind the camera
+    // 顶点过近、过远或在相机背后时跳过
     vertex.copy(results[i].position)
 
     const cameraToVertex = vertex.sub(camera.position)
@@ -314,29 +310,29 @@ function getOnScreen(camera: {
       continue
     }
 
-    // check if the vertex projects within the screen frame
+    // 检查顶点投影是否落在屏幕范围内
     vertex.copy(results[i].position)
     const proj = vertex.project(camera as never)
 
-    // check if item's center is on screen ( bound = +/- 25 % )
+    // 检查项的中心是否在屏幕内（bound = ±25%）
     if (proj.x < -bound || proj.y < -bound || proj.x > bound || proj.y > bound) {
       continue
     }
 
-    // stores the distance to camera within the asset
+    // 把到相机的距离记录到资产上
     results[i].cameraDistance = dist
     output.push(results[i])
   }
 
-  // sort on distance to camera (closest first)
+  // 按到相机的距离排序（最近的在前）
   output.sort(function (a, b) {
     return a.cameraDistance - b.cameraDistance
   })
 
-  // 3 LOD binning
-  // fills arrays containing assets per LOD
+  // 3 LOD 分箱
+  // 填充按 LOD 分组的资产数组
 
-  // creates an empty bin per LOD
+  // 为每个 LOD 创建一个空箱
   const bins: number[] = []
   let max = 0
   descriptors.forEach(function (desc) {
@@ -344,7 +340,7 @@ function getOnScreen(camera: {
     max += desc.tileCount
   })
 
-  // stores as many assets as possible in the bins
+  // 在容量允许范围内尽可能多地把资产放入箱中
   const assets: GridAsset[] = []
   let id = 0
 

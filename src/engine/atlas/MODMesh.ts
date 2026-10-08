@@ -7,21 +7,14 @@ import type { Texture } from './Texture'
 
 type LODTextureOptions = ConstructorParameters<typeof LODTexture>[0]
 
-/**
- * The canvas backed `LODTexture` API the (dead) MOD code was written against.
- */
+/** 旧版 MOD 代码所依赖的、基于 canvas 的 `LODTexture` 接口。 */
 export interface CanvasTextureLike {
   canvas: HTMLCanvasElement
 }
 
 /**
- * Ported from `js/atlas/mod_mesh.js` ("Mesh On Demand").
- *
- * NOTE: this module is dead code in this snapshot — `js/atlas/atlas.js` has its
- * single instantiation commented out — and it calls a `LODTexture` API from an
- * older revision (`texture.events`, `texture.assetSize`). It is ported as-is so
- * the `MODMesh` / `MOD` globals keep existing, and the texture access is kept
- * behind a structural type for the same reason.
+ * 旧版 `LODTexture` 的接口，MOD 代码按它编写；
+ * 当前纹理可能缺少这些成员，因此均声明为可选。
  */
 
 interface ModTexture {
@@ -37,8 +30,9 @@ export interface ModAssetEvent {
   coords: { x: number; y: number; w: number; h: number; id?: string }
 }
 
+/** 按需加载网格：把动态加载的资产追加到几何体与资产列表中。 */
 export class MODMesh extends Mesh {
-  // dictionary that keeps a record of an asset coordinates in the LOD texture
+  // 记录各资产在 LOD 纹理中的坐标
   assetsCoords: Record<string, ModAssetEvent['coords']> = {}
 
   onAssetInCallback: ((asset: Asset) => void) | null = null
@@ -68,7 +62,7 @@ export class MODMesh extends Mesh {
     this.geometry.append(asset, event.coords)
     this.assetsCoords[asset.id] = event.coords
 
-    // append to this asset list
+    // 加入本网格的资产列表
     this.assets[asset.id] = asset
 
     atlasInstance().addAsset(asset.id, this)
@@ -79,6 +73,6 @@ export class MODMesh extends Mesh {
   }
 
   onAssetOut(): void {
-    // nothing to do yet (kept from the original)
+    // 暂无需处理
   }
 }

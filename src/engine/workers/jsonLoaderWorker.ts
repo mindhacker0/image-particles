@@ -1,11 +1,7 @@
 import { twixAjax } from './twixWorker'
 
 /**
- * Ported from `js/works/json_loader.js`.
- *
- * Fetches a JSON document for `JSONLoader` (`src/engine/utils/JSONLoader.ts`).
- * It was a classic script bootstrapped in a blob worker (so it had a `Twix`),
- * it is a module worker now.
+ * JSON 加载 worker：为 `JSONLoader`（`src/engine/utils/JSONLoader.ts`）抓取 JSON 文档。
  */
 
 interface WorkerScope {
@@ -20,6 +16,7 @@ interface JsonLoaderMessage {
   url: string
 }
 
+/** worker 入口：按消息中的 url 抓取 JSON 并回传。 */
 worker.onmessage = function (event: MessageEvent) {
   const message = event.data as JsonLoaderMessage
   const uuid = message.uuid

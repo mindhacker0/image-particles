@@ -1,20 +1,11 @@
 /**
  *
- * The model layer: the shared item table (`Model.items`) that the whole
- * application reads (title, image url, year, tsne / rasterfairy / colour
- * properties) and the helpers that fill it.
+ * 模型数据层：整个应用共享的数据表（`Model.items`，保存标题、图片地址、年份、
+ * tsne / rasterfairy / 颜色等属性）以及填充该表的辅助函数。
  *
- * Notes on the port:
- * - every global the classic script created is exported under the same name and
- *   imported as ESM by the modules that use them
- * - `createLegacyWorker` and the colour helpers are the already ported modules;
- *   the worker script itself (`js/works/models.js`) is untouched and still
- *   posts the same messages for the same backend urls
- * - `atlas` is owned by `src/engine/Main.ts`, so it is read through the
- *   shared accessor of `src/engine/legacyScope.ts`
- * - the image urls (`data/rasterfairy.png`, `data/timeline.png`,
- *   `data/colors.png`, `data/heightmap.png`, `data/tsne.bin`) and the request
- *   payloads are unchanged
+ * 各属性由对应图片逐像素解析写入（`data/rasterfairy.png`、`data/timeline.png`、
+ * `data/colors.png`、`data/heightmap.png`、`data/tsne.bin`）；`atlas` 由
+ * `src/engine/Main.ts` 持有，因此统一通过 `src/engine/legacyScope.ts` 的访问器读取。
  */
 import { Vector2 } from 'three'
 import type { Asset } from '../atlas/Asset'
@@ -22,16 +13,16 @@ import { atlasInstance } from '../legacyScope'
 import { convertColor, rgbToHex } from '../utils/color'
 import { createLegacyWorker } from '../workers/createLegacyWorker'
 
-/** One entry of the item table (`Model.items`). */
+/** 数据表 `Model.items` 中的一条条目。 */
 export interface ModelItem {
   id?: string
   title?: string
   image_url?: string
-  /** built by `updateItem` (unix seconds -> Date) or by the dates pass */
+  /** 由 `updateItem`（unix 秒 → Date）或日期解析流程写入 */
   date_created?: Date | null
-  /** year, written by the dates pass */
+  /** 年份，由日期解析流程写入 */
   year?: number | null
-  /** raised by `updateItem` once the entry has been filled */
+  /** 条目填充完成后由 `updateItem` 置位 */
   updated?: boolean
   rasterfairy_index?: number | null
   rasterfairy_x?: number
@@ -44,7 +35,7 @@ export interface ModelItem {
   [key: string]: unknown
 }
 
-/** The shared table; `Model.items` below is the very same object. */
+/** 共享数据表；下面的 `Model.items` 与之是同一个对象。 */
 export const items: Record<string, ModelItem> = {}
 
 export const Model: { items: Record<string, ModelItem> } = { items }
@@ -59,14 +50,10 @@ export let rasterfairySizeMaxHeight = 0
 export const itemsPropertiesLoaded: Record<string, boolean> = {}
 export const itemsPropertiesOnLoading: Record<string, boolean> = {}
 
-/**
- * `createLegacyWorker` comes from `src/engine/workers/createLegacyWorker.ts`: it
- * resolves the script through Vite and gives the worker the Twix helper its
- * source expects (a worker has no access to the page globals).
- */
+/** 数据请求 worker：把旧脚本路径映射到 Vite 打包后的模块 worker。 */
 export const worker = createLegacyWorker('works/models.js')
 
-/** Options of a request posted to `js/works/models.js`. */
+/** 发送给数据 worker 的请求选项。 */
 interface ModelRequestOptions {
   type?: string
   assetId?: string
@@ -76,7 +63,7 @@ interface ModelRequestOptions {
   [key: string]: unknown
 }
 
-/** A message posted back by `js/works/models.js`. */
+/** 数据 worker 回传的消息。 */
 interface ModelWorkerMessage {
   type: string
   uuid: string
@@ -85,19 +72,14 @@ interface ModelWorkerMessage {
 }
 
 /**
- * The legacy switch routed a `Dates` message to an `onDates` global that no file
- * in the project defines, and nothing ever posts a `Dates` message (the worker
- * knows the type, the page never asks for it), so the branch is unreachable.
- *
- * The declaration below is ambient: it emits no code, so calling it would still
- * throw a ReferenceError exactly like the classic script, and the routing stays
- * identical to `js/data/models.js`.
+ * `Dates` 消息会被路由到这里，但页面从不发送该消息（只有 worker 定义了该类型），
+ * 因此该分支不可达。下面是环境声明，不产生任何代码，真正调用仍会抛 ReferenceError。
  */
 declare function onDates(data: ModelWorkerMessage): void
 
 /**
- * Request callbacks: keyed by request uuid, except the four property loaders
- * which use their property id (`rasterfairy`, `dates`, `tsne`, `colors`).
+ * 请求回调表：以请求 uuid 为键，四个属性加载器除外（用属性 id：`rasterfairy`、
+ * `dates`、`tsne`、`colors`）。
  */
 type ModelCallback = (...args: unknown[]) => void
 
@@ -131,6 +113,7 @@ worker.addEventListener('message', function (event: MessageEvent) {
   }
 })
 
+/** 生成随机 uuid 字符串。 */
 export function guid(): string {
   function s4(): string {
     return Math.floor((1 + Math.random()) * 0x10000)
@@ -141,6 +124,7 @@ export function guid(): string {
     s4() + '-' + s4() + s4() + s4()
 }
 
+/** 读取单条条目：命中缓存则立即回调，否则向 worker 请求。 */
 export function getItem(assetId: string, callback: (item: ModelItem) => void): void {
   if (Model.items[assetId] && Model.items[assetId]['updated'])
     callback(Model.items[assetId])
@@ -151,6 +135,7 @@ export function getItem(assetId: string, callback: (item: ModelItem) => void): v
   }
 }
 
+/** worker 返回单条条目后的处理：写入数据表并回调。 */
 export function onItem(data: ModelWorkerMessage): void {
   const cb = cbs[data.uuid]
   updateItem(data.opts.assetId as string, data.json as Record<string, unknown>)
@@ -158,12 +143,11 @@ export function onItem(data: ModelWorkerMessage): void {
   delete cbs[data.uuid]
 }
 
+/** 批量读取条目：向 worker 请求并按返回结果更新数据表。 */
 export function getItems(ids: string[], callback: (items: ModelItem[]) => void): void {
   const uuid = guid()
   cbs[uuid] = callback
 
-  //console.log('°°°°°° Call items : ');
-  //console.log(ids);
   worker.postMessage({
     type: 'Items',
     uuid,
@@ -174,12 +158,12 @@ export function getItems(ids: string[], callback: (items: ModelItem[]) => void):
   })
 }
 
+/** 将 worker 返回的字段写入数据表；`date_created` 会转成 `Date`。 */
 export function updateItem(id: string, data: Record<string, unknown>): void {
-  // console.log('                         > update item '+id);
   if (!Model.items[id]) { Model.items[id] = {} }
   for (const prop in data) {
     if (prop === 'date_created') {
-      // the backend sends the timestamp as a string; `parseInt` coerces either way
+      // 后端返回的时间戳是字符串，`parseInt` 两种情况都能处理
       Model.items[id].date_created = (data.date_created) ? new Date(parseInt(data.date_created as string) * 1000) : null
     } else {
       Model.items[id][prop] = data[prop]
@@ -189,6 +173,7 @@ export function updateItem(id: string, data: Record<string, unknown>): void {
   Model.items[id]['updated'] = true
 }
 
+/** worker 返回批量条目后的处理：逐条写入数据表并回调。 */
 export function onItems(data: ModelWorkerMessage): void {
   const json = data.json as ModelItem[]
   const cb = cbs[data.uuid]
@@ -199,13 +184,13 @@ export function onItems(data: ModelWorkerMessage): void {
   delete cbs[data.uuid]
 }
 
+/** 批量读取图片地址：向 worker 请求并回填数据表，返回 id → url 映射。 */
 export function getImages(
   ids: string,
   fromAllChannels: boolean | undefined,
   results: string[],
   callback: (urls: Record<string, string>) => void,
 ): void {
-  // console.log('get images --- nb ids '+ids.length);
   const uuid = guid()
   cbs[uuid] = callback
   worker.postMessage({
@@ -218,11 +203,12 @@ export function getImages(
   })
 }
 
+/** worker 返回图片地址后的处理：回填数据表并回调。 */
 export function onImages(data: ModelWorkerMessage): void {
   const json = data.json as { id: string; u: string }[]
   const results = data.opts.results as string[]
   const cb = cbs[data.uuid]
-  // fill the image_url information on the global "items" dict
+  // 把图片地址回填到共享数据表
   for (let i = 0; i < json.length; i++) {
     const mid = json[i]['id']
     const url = json[i]['u']
@@ -234,13 +220,12 @@ export function onImages(data: ModelWorkerMessage): void {
     dict[mid] = Model.items[mid].image_url as string
   }
   cb(dict)
-  // NOTE (legacy quirk kept as-is): unlike `onItem` / `onItems`, the original
-  // never deletes `cbs[data.uuid]` here, so the callback stays in the registry.
-  // It is only reached with a fresh uuid, so the behaviour is invisible.
+  // 与 `onItem` / `onItems` 不同，这里不删除 `cbs[data.uuid]`，回调会一直留在注册表里；
+  // 因为每次都用新的 uuid 调用，实际没有影响。
 }
 
-// -------------------- SEARCH CALLS ------------------------
-// global -
+// -------------------- 搜索调用 ------------------------
+// 全局搜索
 export function getSearch(search: string, callback: (resp: Record<string, ModelItem>, totalCount: number) => void): void {
   const uuid = guid()
   cbs[uuid] = callback
@@ -250,7 +235,7 @@ export function getSearch(search: string, callback: (resp: Record<string, ModelI
     },
   })
 }
-// artist -
+// 按艺术家名称搜索
 export function getSearchByArtistName(search: string, callback: (resp: Record<string, ModelItem>, totalCount: number) => void): void {
   const uuid = guid()
   cbs[uuid] = callback
@@ -269,7 +254,7 @@ export function getSearchByArtistId(search: string, callback: (resp: Record<stri
     },
   })
 }
-// partner -
+// 按合作方 id 搜索
 export function getSearchByPartnerId(search: string, callback: (resp: Record<string, ModelItem>, totalCount: number) => void): void {
   const uuid = guid()
   cbs[uuid] = callback
@@ -280,22 +265,21 @@ export function getSearchByPartnerId(search: string, callback: (resp: Record<str
   })
 }
 
-// ----- search complete ------
+// ----- 搜索返回 ------
 export function onSearch(data: ModelWorkerMessage): void {
   const json = data.json as { items?: { id: string; title: string; img: string }[]; totalCount: number }
   const jsonItems = json.items
   const totalCount = json.totalCount
   const resp: Record<string, ModelItem> = {}
   if (!jsonItems) {
-    // the legacy code indexed the registry directly (an unknown uuid throws)
+    // 直接按 uuid 取回调，未知 uuid 会抛错
     cbs[data.uuid]({}, 0)
-    // NOTE (legacy quirk kept as-is): neither this early return nor the normal
-    // path below deletes `cbs[data.uuid]`.
+    // 这条提前返回和下面的正常路径都不删除 `cbs[data.uuid]`
     return
   }
   for (let i = 0; i < jsonItems.length; i++) {
     const mid = jsonItems[i].id
-    // update items in the cached dict
+    // 更新缓存数据表中的条目
     Model.items[mid] = Model.items[mid] || {}
     Model.items[mid]['id'] = jsonItems[i].id
     Model.items[mid]['title'] = jsonItems[i].title
@@ -307,24 +291,23 @@ export function onSearch(data: ModelWorkerMessage): void {
   cb(resp, totalCount)
 }
 
-// -------- AUTOCOMPLETE ----------
+// -------- 自动补全 ----------
+/** 请求自动补全列表。 */
 export function getAutocompleteList(callback: (json: unknown) => void): void {
   const uuid = guid()
   cbs[uuid] = callback
   worker.postMessage({ type: 'AutocompleteList', uuid, opts: {} })
 }
 
+/** 自动补全列表返回后的处理。 */
 export function onAutocompleteList(data: ModelWorkerMessage): void {
   cbs[data.uuid](data.json)
-  // NOTE (legacy quirk kept as-is): `cbs[data.uuid]` is not deleted here either.
+  // 这里同样不删除 `cbs[data.uuid]`
 }
 
-/**** ---------- FROM IMAGES ---------- *****/
+/**** ---------- 由图片解析属性 ---------- *****/
 
-/**
- * `atlas` belongs to `js/atlas/atlas.js` (not ported yet); the shared accessor
- * gives typed access to the properties this module uses.
- */
+/** 通过共享访问器获取 `atlas` 中用到的属性。 */
 interface LegacyAtlas {
   assets: Asset[]
   skipAnimation(): void
@@ -334,18 +317,14 @@ function legacyAtlas(): LegacyAtlas {
   return atlasInstance() as unknown as LegacyAtlas
 }
 
-/** `convertColor(hex, true)` returns a number, the ported helper types the union. */
+/** `convertColor(hex, true)` 返回数字，此处收窄类型。 */
 function hexToNumber(hex: string): number {
   return convertColor(hex, true) as number
 }
 
 /**
- * `ImageTsneFormula` is read by `getTsne` below (and by
- * `js/camera/controls/tsneControls.js`) but no file of this snapshot defines it:
- * the original build shipped a formula script that is missing here. The
- * declaration is ambient (no emitted code), so reaching it at runtime still
- * throws a ReferenceError exactly like the classic script. `getTsne` itself is
- * unused here, and neither `data/heightmap.png` nor `data/tsne.bin` exists yet.
+ * `getTsne` 会用到 `ImageTsneFormula`，但本项目未定义它：下面是环境声明，
+ * 不产生任何代码，运行到仍会抛 ReferenceError（`getTsne` 目前也未被调用）。
  */
 declare const ImageTsneFormula: {
   ctx?: unknown
@@ -355,6 +334,7 @@ declare const ImageTsneFormula: {
   getHeightAt?(x: number, y: number): number
 }
 
+/** 从 `data/rasterfairy.png` 解析 rasterfairy 索引与网格坐标（每个像素对应一个资源）。 */
 export function getRasterfairy(callback?: () => void): void {
   if (itemsPropertiesLoaded[propertyIdRasterfairy]) {
     if (typeof callback === 'function') callback()
@@ -386,10 +366,6 @@ export function getRasterfairy(callback?: () => void): void {
 
     const rasterfairySize = 440
 
-    //var size = imageObj.width-1;
-    //rasterfairySize = size;
-    // NOTE: the original declared `index` a second time here (and an unused `p`);
-    // a single `index` binding is kept.
     let x_raster = 0
     let y_raster = 0
     let i = 0
@@ -438,6 +414,7 @@ export function getRasterfairy(callback?: () => void): void {
   imageObj.src = 'data/rasterfairy.png'
 }
 
+/** 从 `data/heightmap.png` 与 `data/tsne.bin` 解析条目的 tsne 坐标。 */
 export function getTsne(callback?: () => void): void {
   if (itemsPropertiesLoaded[propertyIdTsne]) {
     if (typeof callback === 'function') callback()
@@ -450,149 +427,10 @@ export function getTsne(callback?: () => void): void {
 
   itemsPropertiesOnLoading[propertyIdTsne] = true
 
-  /*
-  var imageObj = new Image();
-  var multiplyValue = 100000;
-  var offsetValue = 50;
-
-   // -> start image loader
-
-  imageObj.onload = function() {
-
-    var imageW = imageObj.width, imageH = imageObj.height;
-    var canvas = document.createElement('canvas');
-    canvas.id     = "tsnecanvas";
-    canvas.width  = imageW;
-    canvas.height = imageH;
-
-    var context = canvas.getContext('2d');
-    context.drawImage(this, 0, 0);
-    var pixelData = context.getImageData(0,0,imageW, imageH);
-
-    var hex_x = "", hex_y = "", tx = 0, ty =0, parsingIndex = 0, i = 0, asset = null;
-
-    ImageTsneFormula.min = new Vector2(Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY);
-    ImageTsneFormula.max = new Vector2(Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY);
-
-    for (var y = 0; y < pixelData.height; y++) {
-      for (var x = 0; x < pixelData.width; x++) {
-        parsingIndex = (x + y * imageW) * 4;
-
-        if (x%2 == 0){
-          asset = atlas.assets[i];
-          if (asset)
-            hex_x = "#" + ("000000" + rgbToHex(pixelData.data[parsingIndex], pixelData.data[parsingIndex+1], pixelData.data[parsingIndex+2])).slice(-6);
-
-          i++;
-        }else if(asset){
-
-          hex_y = "#" + ("000000" + rgbToHex(pixelData.data[parsingIndex], pixelData.data[parsingIndex+1], pixelData.data[parsingIndex+2])).slice(-6);
-
-          if(hex_x == "#000000" && hex_y == "#000000"){
-            tx = null;
-            ty = null;
-          }else{
-            tx = convertColor(hex_x, true);
-            ty = convertColor(hex_y, true);
-
-            tx = tx/multiplyValue - offsetValue;
-            ty = ty/multiplyValue - offsetValue;
-          }
-
-          //if(i< 40)
-          //  console.log(asset.id+" : "+tx+" / "+ty);
-
-          Model.items[asset.id]['tsne_x'] = tx;
-          Model.items[asset.id]['tsne_z'] = ty;
-
-          // ImageTsneFormula.ctx = Math.min( position.x, ImageTsneFormula.min.x );
-          ImageTsneFormula.min.x = Math.min( tx, ImageTsneFormula.min.x );
-          ImageTsneFormula.min.y = Math.min( ty, ImageTsneFormula.min.y );
-          ImageTsneFormula.max.x = Math.max( tx, ImageTsneFormula.max.x );
-          ImageTsneFormula.max.y = Math.max( ty, ImageTsneFormula.max.y );
-
-
-        }
-      }
-    }
-
-
-    ImageTsneFormula.size = new THREE.Vector2(  ImageTsneFormula.max.x - ImageTsneFormula.min.x,
-                                                ImageTsneFormula.max.y - ImageTsneFormula.min.y );
-    // console.log (ImageTsneFormula.min, ImageTsneFormula.max, ImageTsneFormula.size);
-
-
-    //uses the height map to set the height ( Y ) value
-    var data = ImageTsneFormula.heightMapData;
-    for( var id in Model.items ){
-
-      tx = Model.items[ id ]['tsne_x'];
-      ty = Model.items[ id ]['tsne_z'];
-
-      var dx = parseInt( map(tx, ImageTsneFormula.min.x, ImageTsneFormula.max.x, 0, heightmap.width  ));
-      var dy = parseInt( map(ty, ImageTsneFormula.min.y, ImageTsneFormula.max.y, 0, heightmap.height ));
-      var heightId = ( dx + dy * heightmap.width ) * 4;
-
-      var height = data[ heightId ];
-      while (height == 0) {
-        heightId += 4;
-        height = data[heightId];
-      }
-
-      Model.items[ id ]['tsne_y'] = height / 0xFF;
-
-    }
-
-    itemsPropertiesLoaded[propertyIdTsne] = true;
-
-    var cb = cbs[propertyIdTsne];
-    if(typeof cb == "function") cb();
-
-    itemsPropertiesOnLoading[propertyIdTsne] = false;
-
-  };
-  // <- end image loader */
-
-
-  //text based coordinates
-  // var xhr = new XMLHttpRequest();
-  // xhr.onload = function(e){
-  //
-  //   var values = e.target.responseText.split(",").map( function(v){ return parseFloat( v ); });
-  //   while( isNaN( values[ values.length-1 ] ) ){
-  //     // console.log( "getTsne > NaN");
-  //     values.pop();
-  //   }
-  //
-  //   for( var k = 0; k < atlas.assets.length; k++ ){
-  //
-  //     var i = k * 3;
-  //     var asset = atlas.assets[k];
-  //     Model.items[asset.id]['tsne_x'] = values[   i   ];
-  //     Model.items[asset.id]['tsne_y'] = values[ i + 1 ];
-  //     Model.items[asset.id]['tsne_z'] = values[ i + 2 ];
-  //
-  //   }
-  //   atlas.skipAnimation();
-  //   // console.log( values.length, values.length/3 );
-  //
-  //   //------ callabck methods
-  //
-  //   itemsPropertiesLoaded[propertyIdTsne] = true;
-  //
-  //   var cb = cbs[propertyIdTsne];
-  //   if(typeof cb == "function") cb();
-  //
-  //   itemsPropertiesOnLoading[propertyIdTsne] = false;
-  //
-  //
-  // };
-
-
-  //loads the TSNE heightmap
+  // 加载 TSNE 高度图
   const heightmap = new Image()
   heightmap.onload = function () {
-    //stores th e heightmap
+    // 保存高度图数据
     const canvas = document.createElement('canvas')
     canvas.width = heightmap.width
     canvas.height = heightmap.height
@@ -605,15 +443,7 @@ export function getTsne(callback?: () => void): void {
     ImageTsneFormula.heightMapWidth = heightmap.width
     ImageTsneFormula.heightMapHeight = heightmap.height
 
-    //loads the TSNE data
-    // imageObj.src = "/freefall/data/tsne.png";
-
-    //loads the text file
-    // xhr.open( 'GET', "/freefall/data/tsne.bin" );
-    // xhr.send();
-
-
-    //loads
+    // 加载 TSNE 二进制数据
     const xhr = new XMLHttpRequest()
     xhr.open('GET', 'data/tsne.bin', true)
     xhr.responseType = 'arraybuffer'
@@ -627,7 +457,7 @@ export function getTsne(callback?: () => void): void {
         off += 2
       }
 
-      //set tsne coordinates
+      // 写入 tsne 坐标
       const assets = legacyAtlas().assets
       for (let k = 0; k < assets.length; k++) {
         const i = k * 3
@@ -637,9 +467,8 @@ export function getTsne(callback?: () => void): void {
         Model.items[asset.id]['tsne_z'] = values[i + 2]
       }
       legacyAtlas().skipAnimation()
-      // console.log( values.length, values.length/3 );
 
-      //------ callabck methods
+      // 回调处理
 
       itemsPropertiesLoaded[propertyIdTsne] = true
 
@@ -654,6 +483,7 @@ export function getTsne(callback?: () => void): void {
   heightmap.src = 'data/heightmap.png'
 }
 
+/** 从 `data/timeline.png` 逐像素解析年份与 `date_created`（RGB = 年份 + 8300000）。 */
 export function getDates(callback?: () => void): void {
   if (itemsPropertiesLoaded[propertyIdDates]) {
     if (typeof callback === 'function') callback()
@@ -679,14 +509,10 @@ export function getDates(callback?: () => void): void {
     context.drawImage(this, 0, 0)
     const pixelData = context.getImageData(0, 0, imageW, imageH)
 
-    // NOTE (legacy bug kept as-is): `hex` is never reset when an asset is
-    // missing, and the `else` branch below dereferences `asset.id` without the
-    // `if (asset)` guard the line above uses. As soon as the timeline image has
-    // more pixels than the atlas has assets, `asset` is undefined while `hex`
-    // still holds the previous pixel's colour, and the loop throws a TypeError.
-    // Behaviour is unchanged on purpose: `data/timeline.png` is generated with
-    // exactly one pixel per asset (the original `data/timeline.real.png` has
-    // more and triggers the crash).
+    // 注意：资源缺失时 `hex` 不会被重置，且下方 `else` 分支直接解引用 `asset.id`
+    // （没有上面的 `if (asset)` 保护）。一旦图片像素数超过资源数量，`asset` 为
+    // undefined 而 `hex` 仍是上一个像素的颜色，循环会抛 TypeError。因此
+    // `data/timeline.png` 必须保证每个资源恰好一个像素。
     let hex = ''
     let parsingIndex = 0
     let i = 0
@@ -712,8 +538,6 @@ export function getDates(callback?: () => void): void {
           Model.items[asset.id].date_created = new Date()
           Model.items[asset.id].date_created.setFullYear(date)
           Model.items[asset.id].year = date
-
-          // if(asset.id == "IAFicnZ4iaVZFA")console.log(date);
         }
       }
     }
@@ -729,6 +553,7 @@ export function getDates(callback?: () => void): void {
   imageObj.src = 'data/timeline.png'
 }
 
+/** 从 `data/colors.png` 解析每个条目的色相与亮度。 */
 export function getColors(callback?: () => void): void {
   if (itemsPropertiesLoaded[propertyIdColors]) {
     if (typeof callback === 'function') callback()
@@ -754,8 +579,7 @@ export function getColors(callback?: () => void): void {
     context.drawImage(this, 0, 0)
     const pixelData = context.getImageData(0, 0, imageW, imageH)
 
-    // `hex_1`, `hsl`, `color_hue` and `color_bri` are unused in the original as
-    // well (only the commented-out code below reads them).
+    // 这些局部变量未被使用（原实现即是如此）。
     let hex_1 = ''
     let hsl: number[] = []
     let color_hue = 0
@@ -772,7 +596,7 @@ export function getColors(callback?: () => void): void {
 
         asset = assets[i]
         if (asset) {
-          //special test if ZERO -> no infos..
+          // 全黑像素表示无信息
           if (pixelData.data[parsingIndex] === 0 &&
             pixelData.data[parsingIndex + 1] === 0 &&
             pixelData.data[parsingIndex + 2] === 0) {
@@ -783,13 +607,6 @@ export function getColors(callback?: () => void): void {
             Model.items[asset.id].color_hue = pixelData.data[parsingIndex] / 255 * 360
             Model.items[asset.id].color_bri = pixelData.data[parsingIndex + 1]
           }
-
-          //hsl = rgbToHsl(pixelData.data[parsingIndex], pixelData.data[parsingIndex+1], pixelData.data[parsingIndex+2]);
-          //Model.items[asset.id].rgb = [pixelData.data[parsingIndex], pixelData.data[parsingIndex+1], pixelData.data[parsingIndex+2]];
-
-          //if(x == 0){
-          //  console.log(' ---- id : '+asset.id+" --- hue : "+Model.items[asset.id]['color_hue']+" / bri : "+Model.items[asset.id]['color_bri'], Model.items[asset.id]['rbg']);
-          //}
         }
 
         i++

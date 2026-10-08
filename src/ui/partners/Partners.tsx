@@ -5,25 +5,15 @@ import { partnersNodes } from './nodes'
 import { usePartnersState } from './state'
 
 /**
+ * 伙伴面板：`.partners` 容器、`ul` 列表、关闭按钮和居中的 `mdl-spinner`。
  *
- * The markup the legacy class created and mutated: the `.partners` panel with
- * its `ul`, the close button (`mdl-button mdl-js-button mdl-button--fab
- * mdl-js-ripple-effect bgcolor`) and the centered `mdl-spinner`. The classes and
- * the DOM order are the ones of `index.html` so `css/main.css` keeps applying;
- * the `.open` / `.show` / `.is-active` toggles and the two inline styles of
- * `partners_ui.js` (`resize`) are rendered from `state.ts` instead.
+ * 面板通过 portal 渲染到 `<body>`：`FreefallUi` 把界面渲染进 `.cilex-layout`，
+ * 而 MDL 给该元素设置了 `position: relative` 与 `overflow-y: auto`，若面板留在
+ * 其中，其 `top: 100%` 会在布局内产生滚动区，而不是被 `body` 的
+ * `overflow: hidden` 裁剪。
  *
- * The panel keeps the position it had in the original page — a direct child of
- * `<body>` — hence the portal: `FreefallUi` renders the interface inside
- * `.cilex-layout`, and MDL gives that element `position: relative` plus
- * `overflow-y: auto`, so the closed panel (`top: 100%`, height = the window
- * height) would resolve against, and add a scroll area to, the layout instead of
- * being clipped by `body` (`html, body { overflow: hidden }` in `css/main.css`).
- *
- * `FreefallUi` must render `<Partners />` once, after `<FooterNav />` (the panel
- * comes last in the original markup). The instance of the facade is created by
- * `ChapterUi`; until it exists the markup is inert (`getPartnersUi()` is null),
- * which is also why the component is safe to mount before the engine boots.
+ * 门面实例由 `ChapterUi` 创建，实例出现前面板处于惰性状态
+ * （`getPartnersUi()` 为 `null`），因此组件可在引擎启动前安全挂载。
  */
 export function Partners() {
   const state = usePartnersState()
@@ -32,8 +22,7 @@ export function Partners() {
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const preloaderRef = useRef<HTMLDivElement>(null)
 
-  // Keep the event boundary in the component so the JSX describes intent
-  // rather than reaching into the legacy facade inline.
+  // 把事件入口留在组件内，让 JSX 描述意图
   const handleClose = (event: MouseEvent<HTMLButtonElement>) => {
     getPartnersUi()?.onClose(event)
   }
@@ -44,9 +33,8 @@ export function Partners() {
     partnersNodes.closeButton = closeButtonRef.current
     partnersNodes.preloader = preloaderRef.current
 
-    // the spinner and the fab button are MDL components created by React, so the
-    // component handler has to see them (`FreefallUi` runs `upgradeDom` too;
-    // MDL skips the nodes it already upgraded, so running it twice is a no-op)
+    // spinner 与浮动按钮都是 MDL 组件且由 React 创建，需让组件处理器识别它们
+    // （`FreefallUi` 也会运行 `upgradeDom`；MDL 会跳过已升级的节点，重复运行无副作用）
     const componentHandler = (window as unknown as { componentHandler?: { upgradeDom(): void } })
       .componentHandler
 
@@ -72,9 +60,7 @@ export function Partners() {
             <a
               href={entry.href}
               target="_blank"
-              // the original link had no `rel` (a `target="_blank"` window could
-              // reach `window.opener`); the other external links of the port use
-              // `noreferrer`, so this one does too
+              // 外链统一使用 noreferrer，避免新窗口访问 window.opener
               rel="noreferrer"
             >
               <img src={entry.imageUrl} alt={entry.title} />
@@ -91,7 +77,7 @@ export function Partners() {
         <i className="material-icons">close</i>
       </button>
 
-      {/* centered preloader */}
+      {/* 居中的加载指示器 */}
       <div
         ref={preloaderRef}
         className={`mdl-spinner mdl-js-spinner${state.loading ? ' is-active' : ''}`}

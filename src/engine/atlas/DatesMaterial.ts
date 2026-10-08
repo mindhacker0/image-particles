@@ -1,9 +1,6 @@
 import { ShaderMaterial, type IUniform, type Texture as ThreeTexture } from 'three'
 
-/**
- * The original exposed the module as the `DatesMaterial` global with a single
- * `getMaterial(texture)` factory.
- */
+/** 时间线日期标签使用的材质工厂：`getMaterial(texture)` 返回采样贴图的 shader 材质。 */
 
 const DateMaterialVertexShader = `
   precision highp float;

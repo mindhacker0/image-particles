@@ -1,13 +1,10 @@
 /**
- * Mock data layer.
+ * 模拟数据层。
  *
- * The original deployment filled `Model.items` from its backend and loaded the
- * atlas textures from a Google storage bucket. Both are unreachable here, so
- * `scripts/generate-mock-data.mjs` writes local equivalents and this module
- * seeds the item table the engine reads.
+ * 为引擎读取的数据表填充本地数据：`scripts/generate-mock-data.mjs` 生成
+ * `data/mock-items.json`，本模块把它写入 `Model.items`。
  *
- * Seeding is best effort: if no mock file is present (a real deployment), the
- * module stays silent and the engine behaves as before.
+ * 尽力而为：找不到模拟文件时静默跳过，引擎照常运行。
  */
 import { Model } from '../data/Models'
 
@@ -26,7 +23,7 @@ function dateFromYear(year: number): Date {
   return date
 }
 
-/** Loads `data/mock-items.json` into `Model.items` (and the legacy `items` dict). */
+/** 把 `data/mock-items.json` 加载进 `Model.items`。 */
 export async function seedMockItems(): Promise<void> {
   let items: MockItemsFile
 
@@ -35,7 +32,7 @@ export async function seedMockItems(): Promise<void> {
     if (!response.ok) return
     items = (await response.json()) as MockItemsFile
   } catch {
-    // no mock data available: nothing to seed
+    // 没有模拟数据，无需填充
     return
   }
 
@@ -43,7 +40,7 @@ export async function seedMockItems(): Promise<void> {
     const year = typeof item.year === 'number' ? item.year : 0
     Model.items[item.id] = {
       ...item,
-      // the engine expects `date_created` to be a Date (see `updateItem`)
+      // 引擎要求 `date_created` 是 Date（见 `updateItem`）
       date_created: dateFromYear(year),
       year,
     } as unknown as (typeof Model.items)[string]

@@ -1,12 +1,7 @@
 /**
- * The legacy build loaded a `twix.min.js` vendor file that only existed in the
- * original deployment. The npm package named `twix` is unrelated (it is a
- * Moment.js date-range plugin), so the small AJAX surface the UI uses is
- * reimplemented here on top of `fetch`.
+ * 基于 `fetch` 实现的轻量 AJAX 助手，供 UI 使用。
  *
- * Used by:
- *   partners_ui.js  -> Twix.ajax({ type: 'GET', url, success })
- *   sidect.js       -> Twix.post(url, data, success) and .abort()
+ * 提供 `Twix.ajax`（GET）与 `Twix.post`，返回值支持 `abort()`。
  */
 
 interface AjaxOptions {
@@ -21,6 +16,7 @@ export interface LegacyRequest {
   abort: () => void
 }
 
+/** 执行请求并回调成功 / 失败；返回可 abort 的句柄。 */
 function request(options: AjaxOptions): LegacyRequest {
   const { type = 'GET', url, data, success, error } = options
   const controller = new AbortController()
@@ -40,6 +36,7 @@ function request(options: AjaxOptions): LegacyRequest {
   return { abort: () => controller.abort() }
 }
 
+/** 对外暴露的 ajax / post 接口。 */
 export const Twix = {
   ajax: (options: AjaxOptions): LegacyRequest => request(options),
   post: (url: string, data: BodyInit, success?: (body: string) => void): LegacyRequest =>

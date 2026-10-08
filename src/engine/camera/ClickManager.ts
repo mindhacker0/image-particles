@@ -20,60 +20,32 @@ import {
 } from '../Main'
 
 /**
- * Ported from `js/camera/clickManager.js`.
- *
- * Picking manager of the atlas: it renders the assets once into an offscreen
- * `WebGLRenderTarget` with their uid baked into the pixels (`pick`) and reads the
- * pixel under the pointer back, so a click can be resolved to an asset. Hammer
- * (tap / double tap) and the pan recognizers drive the cursor and the navigation,
- * `atlas.testClickRaycastLabels` / `atlas.clickRaycastLabels` handle the metadata
- * labels.
- *
- * Port notes:
- * - the IIFE shape of the original is kept, so `clickManager` stays a single
- *   object with the same members (`init`, `update`, `setSize`, `pick`,
- *   `pickingTexture`, `pixelBuffer`); it is published as the `clickManager`
- *   global by `src/engine/Main.ts`
- * - `Hammer` is imported from the npm package; the imported `HammerStatic` /
- *   `HammerManager` / `HammerInput` types come from `@types/hammerjs`
- * - `three` and `tsneSphere` come from the ported modules; the
- *   globals of `src/engine/Main.ts` (`renderer`, `scene`, `camera`, `atlas`,
- *   `app`) and of `js/camera/cameraControls.js` (`cameraControls`) are read at
- *   call time through the typed getters below
- * - `renderer.render(scene, camera, pickingTexture)` became
- *   `setRenderTarget(pickingTexture)` + `render(scene, camera)` +
- *   `setRenderTarget(null)`: three r163 removed the render target argument of
- *   `render` (it is now ignored), so the legacy call would have drawn the picking
- *   pass on screen instead of into the picking texture
- * - `width`, `height` and `mouseMoved` are written but never read in the original
- *   as well (left over state): kept 1:1
- * - `rollOverStartTime` is never initialised in the original either, so
- *   `Date.now() > undefined` is false and the rollover branch of `update` stays
- *   dead until `onMouseMove` sets it while panning. It is kept 1:1 (and nothing
- *   calls `update` in this snapshot); the `console.time("roll")` without its
- *   `timeEnd` is a leftover debug call that is kept as well
+ * atlas 的拾取管理器。
+ * 将素材（uid 烘入像素）渲染到离屏 WebGLRenderTarget，再读回指针所在像素，
+ * 从而把点击解析为具体素材。Hammer 的 tap / doubletap / pan 驱动光标与导航，
+ * 元数据标签由 atlas 的 raycast 方法处理。
  */
 
-/** What `pick` / the metadata labels can return. */
+/** `pick` 与元数据标签可能返回的对象。 */
 export type PickableAsset = Asset | MetadataAsset
 
 /**
- * The event shape the handlers receive: a Hammer event (`type`, `center`) or the
- * `lastMouse` state object `update` feeds back into `onClick`.
+ * 处理函数收到的事件：Hammer 事件（`type`、`center`），
+ * 或 `update` 回传给 `onClick` 的 `lastMouse` 状态对象。
  */
 interface ClickEvent {
   type?: string
   center: { x: number; y: number }
 }
 
-/** `lastMouse`: `onClick` writes `x` / `y`, which the initial literal does not declare. */
+/** `lastMouse`：`onClick` 会写入初始字面量未声明的 `x` / `y`。 */
 interface LastMouseState extends ClickEvent {
   type: string
   x?: number
   y?: number
 }
 
-/** `cameraControls` (`js/camera/cameraControls.js`) as this module uses it. */
+/** 本模块使用的 cameraControls 接口。 */
 interface ClickCameraControls {
   state: number
   VISUALIZER_WAVES: number
@@ -83,50 +55,49 @@ interface ClickCameraControls {
   orbitControls: { enabled: boolean; down: boolean; forceMouseUp(): void }
 }
 
-/** `app` (`js/apps/app_freefall.js`): only its optional editor panel is read. */
+/** `app`：仅读取其可选的编辑面板。 */
 interface ClickApp {
   editorPanel?: { opened: boolean; getWidth(): number }
 }
 
 /* ------------------------------------------------------------------------- *
- * Globals written by `src/engine/Main.ts` (`js/main.js`) and by the
- * not-yet-ported classic scripts. They are read at call time: they do not exist
- * yet while this module is evaluated.
+ * 由主模块提供、需在调用时惰性读取的共享对象。
+ * 本模块初始化时它们尚未就绪。
  * ------------------------------------------------------------------------- */
 
-/** the renderer created by `Main.initTHREE`. */
+/** 渲染器。 */
 function renderer(): WebGLRenderer {
   return engineRenderer
 }
 
-/** the scene created by `Main.initTHREE`. */
+/** 场景。 */
 function scene(): Scene {
   return engineScene
 }
 
-/** the camera created by `Main.initTHREE`. */
+/** 相机。 */
 function camera(): PerspectiveCamera {
   return engineCamera
 }
 
-/** the atlas instance created by `Main.appStart`. */
+/** atlas 实例。 */
 function atlas(): Atlas {
   return engineAtlas
 }
 
-/** the engine's camera controls. */
+/** 引擎的相机控制器。 */
 function cameraControls(): ClickCameraControls {
   return engineCameraControls as unknown as ClickCameraControls
 }
 
-/** the application object built by `Main.setup`. */
+/** 应用对象。 */
 function app(): ClickApp {
   return engineApp as unknown as ClickApp
 }
 
-/** The public surface of the module, i.e. the legacy `clickManager` object. */
+/** 对外暴露的 clickManager 对象。 */
 export interface ClickManager {
-  /** assigned by `init`: the member does not exist before it runs */
+  /** 由 `init` 赋值，运行前不存在。 */
   pickingTexture?: WebGLRenderTarget
   pixelBuffer?: Uint8Array
   init(w: number, h: number): void
@@ -148,6 +119,7 @@ export const clickManager: ClickManager = (function (exports: ClickManager) {
   const rolloverInactivityTimeOut = 500
   const rolloverRefreshRate = 100
 
+  /** 初始化拾取纹理、光标状态与 Hammer 监听。 */
   exports.init = function (w, h) {
     width = w
     height = h
@@ -161,7 +133,6 @@ export const clickManager: ClickManager = (function (exports: ClickManager) {
 
     hammer = new Hammer(renderer().domElement)
 
-    // hammer.on( "press", onClick );
     hammer.add(new Hammer.Tap({ interval: 0, taps: 1, time: 250, threshold: 10 }))
     hammer.on('tap', onClick)
     hammer.on('doubletap', onClick)
@@ -173,23 +144,19 @@ export const clickManager: ClickManager = (function (exports: ClickManager) {
     exports.pixelBuffer = pixelBuffer
 
     renderer().domElement.addEventListener('mousemove', onMouseMove, false)
-
-    // exports.update();
   }
 
+  /** 每帧检测悬停：将光标切换为 pointer / default。 */
   exports.update = function () {
     requestAnimationFrame(exports.update)
 
     if (Date.now() > rollOverStartTime) {
       console.time('roll')
-      // console.log( lastMouse.center.x, lastMouse.center.y , Date.now(), rollOverStartTime + rolloverInactivityTimeOut , mouseMoved, ":", Date.now()> rollOverStartTime + rolloverInactivityTimeOut );
 
       rollOverStartTime = Date.now() + rolloverRefreshRate
       renderer().domElement.style.cursor = Boolean(onClick(lastMouse) == null) ? 'default' : 'pointer'
-      // console.log( "check", onClick( lastMouse ), Boolean( onClick( lastMouse ) == null ) )
 
       mouseMoved = false
-      // console.timeEnd( "roll" )
     }
   }
 
@@ -199,15 +166,18 @@ export const clickManager: ClickManager = (function (exports: ClickManager) {
     pickingTexture.setSize(w, h)
   }
 
+  /** 拖拽开始：切换为移动光标。 */
   function onPanStart(e: HammerInput) {
     isPanning = true
     renderer().domElement.style.cursor = 'move'
   }
 
+  /** 拖拽结束。 */
   function onPanEnd(e: HammerInput) {
     isPanning = false
   }
 
+  /** 更新指针位置与光标样式。 */
   function onMouseMove(e: MouseEvent) {
     lastMouse.center.x = e.clientX
     lastMouse.center.y = e.clientY
@@ -223,6 +193,7 @@ export const clickManager: ClickManager = (function (exports: ClickManager) {
     mouseMoved = true
   }
 
+  /** tap / doubletap / roll 时解析命中素材并跳转。 */
   function onClick(e: ClickEvent): PickableAsset | null | undefined {
     if (cameraControls().state == cameraControls().VISUALIZER_WAVES) return
 
@@ -231,7 +202,7 @@ export const clickManager: ClickManager = (function (exports: ClickManager) {
 
     if (e.type == 'press') return
 
-    //starts testing the metadat labels
+    // 开始检测元数据标签
 
     let delta = 0
     if (app().editorPanel && app().editorPanel.opened) {
@@ -247,10 +218,8 @@ export const clickManager: ClickManager = (function (exports: ClickManager) {
         cameraControls().isSelectedAsset(asset) &&
         asset.position.distanceTo(camera().position) < 40
       ) {
-        // console.log( "asset already selected");
         return
       }
-      //console.log( asset.id, Model.items[ asset.id ], asset );
       cameraControls().gotoAsset(asset)
 
       if (cameraControls().trackball.enabled && cameraControls().trackball.down)
@@ -262,18 +231,17 @@ export const clickManager: ClickManager = (function (exports: ClickManager) {
     return asset
   }
 
+  /** 在指针位置读取 picking 纹理像素并解析出对应素材。 */
   exports.pick = function (x, y) {
     if (atlas()) {
-      // if( tsneMesh.mesh )tsneMesh.mesh.visible = false;
       if (tsneSphere.mesh) tsneSphere.mesh.visible = false
 
       atlas().meshes.forEach(function (m) {
         m.material.material.uniforms.renderUidColor.value = 1
       })
 
-      // three r163 dropped the `renderTarget` argument of `render`: the render
-      // target is bound around the call instead (same single pass into
-      // `pickingTexture`, then back to the canvas)
+      // three r163 起 render 不再接受 renderTarget 参数，改为在调用前后绑定渲染目标，
+      // 同样只渲染一遍到 pickingTexture，再切回画布。
       renderer().setRenderTarget(pickingTexture)
       renderer().render(scene(), camera())
       renderer().setRenderTarget(null)
@@ -282,7 +250,6 @@ export const clickManager: ClickManager = (function (exports: ClickManager) {
         m.material.material.uniforms.renderUidColor.value = 0
       })
 
-      // if( tsneMesh.mesh )tsneMesh.mesh.visible = true;
       if (tsneSphere.mesh) tsneSphere.mesh.visible = true
 
       renderer().readRenderTargetPixels(pickingTexture, x, pickingTexture.height - y, 1, 1, pixelBuffer)

@@ -1,12 +1,12 @@
 /**
- * Ported from `js/utils/event_dispatcher.js` (observer pattern helper).
+ * 观察者模式辅助：事件分发器。
  *
- * `js/utils/interactive_objects.js` extends this class and `lod.js`, `mod.js`
- * and `LoaderPool.js` instantiate it, so it stays a real class.
+ * `InteractiveObjects` 继承本类，`lod` / `mod` / `LoaderPool` 也会实例化它。
  */
 
 export type Listener = (...args: unknown[]) => void
 
+/** 判断是否为函数。 */
 export function isFunction(obj: unknown): boolean {
   return typeof obj === 'function'
 }
@@ -14,6 +14,7 @@ export function isFunction(obj: unknown): boolean {
 export class EventDispatcher {
   private readonly listeners = new Map<string, Listener[]>()
 
+  /** 添加监听器。 */
   addListener(label: string, callback: Listener): void {
     if (!this.listeners.has(label)) {
       this.listeners.set(label, [])
@@ -21,6 +22,7 @@ export class EventDispatcher {
     this.listeners.get(label)!.push(callback)
   }
 
+  /** 移除监听器，成功返回 true。 */
   removeListener(label: string, callback: Listener): boolean {
     const listeners = this.listeners.get(label)
 
@@ -37,6 +39,7 @@ export class EventDispatcher {
     return false
   }
 
+  /** 触发事件，有监听器返回 true。 */
   dispatch(label: string, ...args: unknown[]): boolean {
     const listeners = this.listeners.get(label)
 

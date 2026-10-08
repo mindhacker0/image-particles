@@ -1,12 +1,10 @@
 import type { MouseEvent as ReactMouseEvent } from 'react'
 
 /**
- * Bridge between the React components and the `ChapterUi` facade.
+ * React 组件与 `ChapterUi` 门面之间的桥接层。
  *
- * The legacy engine instantiates `ChapterUi` itself (`new ChapterUi()` in
- * `js/apps/app_freefall.js`), so the React components cannot receive the
- * instance as a prop. The instance registers itself here, and the components
- * dispatch the clicks that used to be bound by the facade constructor.
+ * 引擎自己创建 `ChapterUi` 实例，组件无法通过 props 拿到它，
+ * 因此实例在此注册，组件通过 `uiController` 派发点击事件。
  */
 
 export interface UiController {

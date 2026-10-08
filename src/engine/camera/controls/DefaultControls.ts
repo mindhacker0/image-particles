@@ -7,65 +7,36 @@ import { normalizeWheel, type LegacyWheelEvent } from '../../utils/functions'
 import { lerp, map, norm } from '../../utils/math'
 
 /**
- * Ported from `js/camera/controls/defaultControls.js`.
- *
- * Mouse controls of the curator table (drag + wheel), the trackball hand-over
- * used by the random and sphere visualizers and the polar limits of the waves
- * layout.
- *
- * The original was an IIFE returning its own `exports` object; the port keeps
- * every member, argument order and default value, and is meant to be published
- * as the `defaultControls` global that `js/camera/cameraControls.js` drives.
- *
- * Port notes:
- * - `PI` / `RAD` are globals of the not-yet-ported `js/camera/cameraControls.js`
- *   declared with exactly these values: the local copies remove the load-order
- *   dependency on that file.
- * - `lerp` / `norm` / `map` were globals of that same file with the exact same
- *   bodies as `src/engine/utils/math.ts` -> imported from there.
- * - `lastMouse` is a `Vector2` but the original called `set(x, y, 0)` (a
- *   Vector3 shaped call): three ignores the extra argument, so it is dropped.
- * - `exports.axisDistance` is read / written by the wheel case but the original
- *   never assigns it a first value (see `mouseHandler`): kept uninitialised.
- * - Globals still owned by classic scripts (`cameraControls`, `camera`,
- *   `scene`, `mouseWheelDeltaFactor`, `CuratorChapter`) are read at call time
- *   through the small typed helpers below.
+ * 默认相机控制器。
+ * 处理 curator 桌面的拖拽与滚轮、random / sphere 可视化器使用的 trackball 接管，
+ * 以及 waves 布局的极角限制。
  */
 
-/**
- * Declared by `js/camera/cameraControls.js` as `Math.PI` / `Math.PI / 180`.
- * Kept local so this module can be imported before that classic script runs.
- */
+/** 角度常量（本地定义，避免对引入顺序的依赖）。 */
 const PI = Math.PI
 const RAD = Math.PI / 180
 
 /* ------------------------------------------------------------------------- *
- * Legacy globals still owned by the classic scripts.
- * They are read at call time: they do not exist yet while this module is
- * evaluated / imported.
+ * 主模块共享状态。
+ * 它们在模块初始化时尚未就绪，只能在调用时惰性读取。
  * ------------------------------------------------------------------------- */
 
 /**
- * `CuratorChapter` (the rasterfairy bounds of the curator table) is read by
- * `update()` but no file of this snapshot defines it: the curator chapter app
- * is not part of this build. The declaration is ambient (no emitted code), so
- * the `CURATOR_IDLE` drag branch still throws a ReferenceError exactly like the
- * classic script.
+ * CuratorChapter（curator 桌面的 rasterfairy 边界）未在本构建中定义，
+ * CURATOR_IDLE 拖拽分支访问它时会抛 ReferenceError。
  */
 declare const CuratorChapter: { min: { x: number; y: number }; max: { x: number; y: number } }
 
-/** `mouseWheelDeltaFactor`, reassigned by `cameraControls.setState`. */
+/** 滚轮系数，由 `cameraControls.setState` 重新赋值。 */
 function mouseWheelDeltaFactor(): number {
   return shared.mouseWheelDeltaFactor
 }
 
 /**
- * three's `OrbitControls` with the legacy `mouseButtons` key names.
+ * 使用旧版 `mouseButtons` 键名的 three `OrbitControls` 接口。
  *
- * NOTE: the npm `OrbitControls` (r150+) expects `{ LEFT, MIDDLE, RIGHT }` and
- * no longer reads `ORBIT` / `ZOOM` / `PAN`, which the original assigns here
- * (and `js/camera/cameraControls.js` everywhere): the button mapping silently
- * stops working. Kept 1:1, the whole camera layer needs the same fix.
+ * 注意：npm 版 `OrbitControls`（r150+）使用 `{ LEFT, MIDDLE, RIGHT }`，
+ * 不再读取 `ORBIT` / `ZOOM` / `PAN`，下面的赋值不会生效。
  */
 interface LegacyOrbitControls {
   enabled: boolean
@@ -80,7 +51,7 @@ interface LegacyOrbitControls {
   update(): boolean
 }
 
-/** three's `TrackballControls` as this module uses it. */
+/** 本模块使用的 three `TrackballControls` 接口。 */
 interface LegacyTrackballControls {
   enabled: boolean
   enableRotate: boolean
@@ -92,7 +63,7 @@ interface LegacyTrackballControls {
   update(): boolean
 }
 
-/** `cameraControls` (`js/camera/cameraControls.js`) as this module uses it. */
+/** 本模块使用的 cameraControls 接口。 */
 interface DefaultControlsContext {
   tweening: boolean
   orbitControls: LegacyOrbitControls
@@ -112,22 +83,20 @@ function cameraControls(): DefaultControlsContext {
 }
 
 /**
- * Events handed to `mouseHandler`: the raw wheel event (normalized by
- * `normalizeWheel`) or a Hammer event with a `center` (see
- * `js/camera/cameraControls.js`).
+ * 传给 `mouseHandler` 的事件：经 `normalizeWheel` 规范化的滚轮事件，
+ * 或带 `center` 的 Hammer 事件。
  */
 type DefaultControlEvent = LegacyWheelEvent & {
   type: string
   center: { x: number; y: number }
 }
 
-/** The `defaultControls` global consumed by `js/camera/cameraControls.js`. */
+/** 对外暴露的 defaultControls 对象。 */
 interface DefaultControls {
   axis: THREE.Vector3
   distance: number
   /**
-   * `undefined` at runtime: the original reads and writes it in the wheel case
-   * without ever assigning a first value, so any zoom makes it `NaN`.
+   * 运行时未初始化：滚轮分支直接读写它，因此缩放会使其变为 `NaN`。
    */
   axisDistance: number
   init(): void
@@ -153,12 +122,14 @@ export const defaultControls: DefaultControls = (function (exports: DefaultContr
   exports.axis = new THREE.Vector3(0, 0.25, 1).normalize()
   exports.distance = 15000
 
+  /** 初始化：缓存共享的 orbitControls / trackball / target。 */
   exports.init = function () {
     orbitControls = cameraControls().orbitControls
     trackball = cameraControls().trackball
     target = cameraControls().target
   }
 
+  /** 切换到目标状态，并按状态调整 trackball / orbitControls 参数。 */
   exports.setState = function (newState: number) {
     state = newState
     trackball.enabled = false
@@ -191,15 +162,9 @@ export const defaultControls: DefaultControls = (function (exports: DefaultContr
         break
 
       case cameraControls().CURATOR_IDLE:
-        orbitControls.minPolarAngle = RAD * 5 //PI * .5 - RAD * 30;
+        orbitControls.minPolarAngle = RAD * 5
         orbitControls.maxPolarAngle = PI * 0.5 - RAD * 5
         orbitControls.maxDistance = 10000
-
-        // gsap.to( orbitControls, 2, {
-        //     minPolarAngle:RAD * 5,
-        //     maxPolarAngle:PI * .5 - RAD * 5,
-        //     maxDistance: 10000
-        // } );
 
         orbitControls.mouseButtons = {
           ORBIT: THREE.MOUSE.RIGHT,
@@ -214,8 +179,8 @@ export const defaultControls: DefaultControls = (function (exports: DefaultContr
     ready = true
   }
 
+  /** 同步 Shift 键状态，并按当前状态重新映射鼠标按键。 */
   exports.onShift = function (newState: boolean) {
-    //app.hideShift();
     shiftDown = newState
 
     orbitControls.mouseButtons = {
@@ -242,18 +207,15 @@ export const defaultControls: DefaultControls = (function (exports: DefaultContr
   const lastMouse = new THREE.Vector2()
   const drag = new THREE.Vector3()
 
+  /** 处理滚轮、按下与拖拽事件。 */
   exports.mouseHandler = function (event: DefaultControlEvent) {
     if (cameraControls().tweening) return
 
     switch (event.type) {
       case 'wheel':
       case 'mousewheel': {
-        // NOTE: `exports.axisDistance` is never initialised (see the member
-        // documentation): this computes `NaN` in the original as well.
+        // 注意：exports.axisDistance 未初始化，这里的结果为 NaN。
         const delta = -normalizeWheel(event).spinY * mouseWheelDeltaFactor()
-        //var delta = (e.wheelDelta && e.wheelDelta !== undefined)? e.wheelDelta : e.deltaY;
-        // exports.distance += -e.wheelDelta * .25;
-        // exports.distance = Math.max( orbitControls.minDistance, Math.min( exports.distance, orbitControls.maxDistance ) );
 
         exports.axisDistance += delta * 0.25
         exports.axisDistance = Math.max(
@@ -306,6 +268,7 @@ export const defaultControls: DefaultControls = (function (exports: DefaultContr
     }
   }
 
+  /** 每帧更新控制器状态、拖拽惯性与目标约束。 */
   exports.update = function (): boolean | void {
     if (!ready) return false
 
@@ -313,7 +276,7 @@ export const defaultControls: DefaultControls = (function (exports: DefaultContr
 
     const camera = legacyCamera()
 
-    //curator table: recomputes the distance to target during the tweens
+    // curator 桌面：补间期间持续重算到目标的距离
     const dist = camera.position.distanceTo(target.position)
 
     if (state == cameraControls().CURATOR_IDLE) {
@@ -327,7 +290,7 @@ export const defaultControls: DefaultControls = (function (exports: DefaultContr
     }
 
     const len = camera.position.length()
-    //sphere: always remain outside
+    // sphere：始终保持在球体外侧
     if (state == cameraControls().VISUALIZER_SPHERE) {
       trackball.rotateSpeed = 0.01 + map(len, trackball.minDistance, trackball.maxDistance, 0, 1)
       trackball.zoomSpeed = 0.01 + map(len, trackball.minDistance, trackball.maxDistance, 0, 0.1)
@@ -341,7 +304,7 @@ export const defaultControls: DefaultControls = (function (exports: DefaultContr
     }
 
     if (state == cameraControls().CURATOR_IDLE) {
-      //drag
+      // 拖拽
       target.position.add(drag)
       drag.multiplyScalar(0.9)
       if (drag.length() < 0.1 && !drag.equals(ZERO)) {
@@ -349,7 +312,7 @@ export const defaultControls: DefaultControls = (function (exports: DefaultContr
         cameraControls().forceLod()
       }
 
-      //binds target to Rasterfairy grid
+      // 将目标约束到 Rasterfairy 网格
       target.position.y = -1
 
       if (selectedAsset == null) {
@@ -376,7 +339,6 @@ export const defaultControls: DefaultControls = (function (exports: DefaultContr
   }
 
   const sg = new THREE.IcosahedronGeometry(1, 1)
-  // The original never calls this helper (dead code kept for the 1:1 port).
   function createSphere(p: THREE.Vector3, c?: number) {
     const s = new THREE.Mesh(sg, new THREE.MeshBasicMaterial({ color: c || 0x000000 }))
     s.position.copy(p)
@@ -384,23 +346,11 @@ export const defaultControls: DefaultControls = (function (exports: DefaultContr
     return s
   }
 
+  /** 约束钩子（当前为空实现）。 */
   exports.constrain = function () {
-    // if( state == cameraControls.CURATOR_IDLE
-    // ||  state == cameraControls.CURATOR_SELECTION
-    // ||  state == cameraControls.CURATOR_COLOR
-    // ||  state == cameraControls.CURATOR_TIMELINE
-    // ){
-    // console.log( "constrain" );
-    //
-    // exports.distance = camera.position.distanceTo( target.position );
-    // var p = target.position.clone().add( exports.axis.normalize().multiplyScalar( exports.distance ) );
-    // camera.position.copy( p );
-    // camera.position.x += ( p.x - camera.position.x ) * .05;
-    // camera.position.y += ( p.y - camera.position.y ) * .05;
-    // camera.position.z += ( p.z - camera.position.z ) * .05;
-    // }
   }
 
+  /** 记录选中的素材，并在 CURATOR_IDLE 下调整距离。 */
   exports.selectAsset = function (asset: unknown) {
     selectedAsset = asset
     if (state == cameraControls().CURATOR_IDLE) {

@@ -1,7 +1,7 @@
 /**
  *
- * Binary tree based bin packing: grows right or down from the size of the first
- * block and marks every block that fits with a `.fit` node exposing `x` / `y`.
+ * 基于二叉树的装箱算法：以第一个块的尺寸为起点向右或向下扩展，
+ * 为每个装箱成功的块写入带 `x` / `y` 的 `.fit` 节点。
  */
 
 export interface PackerNode {
@@ -23,6 +23,7 @@ export interface PackerBlock {
 export class GrowingPacker {
   root: PackerNode = { x: 0, y: 0, w: 0, h: 0 }
 
+  /** 对一组块执行装箱，结果写入各块的 `fit`。 */
   fit(blocks: PackerBlock[]): void {
     const len = blocks.length
     const w = len > 0 ? blocks[0].w : 0
@@ -42,6 +43,7 @@ export class GrowingPacker {
     }
   }
 
+  /** 在子树中查找能容纳 w×h 的节点，找不到返回 null。 */
   findNode(root: PackerNode, w: number, h: number): PackerNode | null {
     if (root.used) {
       return this.findNode(root.right as PackerNode, w, h) || this.findNode(root.down as PackerNode, w, h)
@@ -54,6 +56,7 @@ export class GrowingPacker {
     return null
   }
 
+  /** 标记节点已用，并切分出下方与右侧的剩余空间。 */
   splitNode(node: PackerNode, w: number, h: number): PackerNode {
     node.used = true
     node.down = { x: node.x, y: node.y + h, w: node.w, h: node.h - h }
@@ -61,12 +64,12 @@ export class GrowingPacker {
     return node
   }
 
+  /** 空间不足时扩展根节点，优先保持接近正方形。 */
   growNode(w: number, h: number): PackerNode | null {
     const canGrowDown = w <= this.root.w
     const canGrowRight = h <= this.root.h
 
-    // attempt to keep square-ish by growing right when height is much greater
-    // than width, and down when width is much greater than height
+    // 尽量保持接近正方形：高度远大于宽度时向右扩展，宽度远大于高度时向下扩展
     const shouldGrowRight = canGrowRight && this.root.h >= this.root.w + w
     const shouldGrowDown = canGrowDown && this.root.w >= this.root.h + h
 
@@ -86,10 +89,11 @@ export class GrowingPacker {
       return this.growDown(w, h)
     }
 
-    // need to ensure sensible root starting size to avoid this happening
+    // 根节点初始尺寸需合理，否则会走到这里
     return null
   }
 
+  /** 向右扩展根节点后重新装箱。 */
   growRight(w: number, h: number): PackerNode | null {
     this.root = {
       used: true,
@@ -105,6 +109,7 @@ export class GrowingPacker {
     return node ? this.splitNode(node, w, h) : null
   }
 
+  /** 向下扩展根节点后重新装箱。 */
   growDown(w: number, h: number): PackerNode | null {
     this.root = {
       used: true,

@@ -9,14 +9,10 @@ import {
 import { legacyCamera, legacyScene } from '../legacyScope'
 
 /**
+ * t-SNE 章节使用的背景球体。
+ * 外部只读取 `tsneSphere.mesh` 来控制其显示 / 隐藏。
  *
- * The original was an immediately invoked module returning its own `exports`
- * object (a `tsneSphere` global); the port keeps that shape because
- * `js/camera/clickManager.js` only reads `tsneSphere.mesh` to hide/show the
- * sphere in the t-SNE chapter.
- *
- * The `uniforms` entries keep their legacy `type` descriptors: modern three
- * ignores the extra property while still using `value`.
+ * uniforms 保留旧的 `type` 描述字段：新版 three 会忽略它，只使用 `value`。
  */
 
 const vertexShader = `
@@ -37,6 +33,7 @@ void main(){
     gl_FragColor = vec4( color, 1. );
 }`
 
+/** t-SNE 球体的公共接口。 */
 export interface TsneSphere {
   mesh: Mesh | null
   init(): void
@@ -85,4 +82,5 @@ function createTsneSphere(): TsneSphere {
   return tsneSphere
 }
 
+/** t-SNE 球体单例。 */
 export const tsneSphere = createTsneSphere()

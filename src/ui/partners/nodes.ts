@@ -1,22 +1,17 @@
 /**
- *
- * Registry of the DOM nodes `Partners.tsx` renders, the same hand-off as
- * `src/ui/uiNodes.ts` (which this feature must not edit): the legacy class kept
- * the four nodes it needs in instance members, so the facade keeps exposing
- * `container`, `container_ul`, `close_button` and `preloader` by reading them
- * here. React owns the markup, so the component publishes the nodes after mount
- * and clears them on unmount — the entries are therefore `null` before the first
- * mount (the legacy snapshots existed from the constructor on).
+ * `Partners.tsx` 渲染的 DOM 节点注册表，与 `src/ui/uiNodes.ts` 思路一致：
+ * 组件挂载后登记节点、卸载时清空，`PartnersUi` 门面据此暴露
+ * `container`、`container_ul`、`close_button` 和 `preloader`。
  */
 
 export interface PartnersNodes {
-  /** `.partners` (legacy `container`) */
+  /** `.partners` 容器。 */
   container: HTMLElement | null
-  /** `.partners ul` (legacy `container_ul`) */
+  /** `.partners ul` 列表。 */
   containerUl: HTMLElement | null
-  /** `.partners button` (legacy `close_button`) */
+  /** `.partners` 的关闭按钮。 */
   closeButton: HTMLElement | null
-  /** `.partners .mdl-spinner` (legacy `preloader`) */
+  /** `.partners` 的加载指示器。 */
   preloader: HTMLElement | null
 }
 

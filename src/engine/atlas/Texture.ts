@@ -1,5 +1,6 @@
 import type { Texture as ThreeTexture } from 'three'
 
+/** 纹理中单个资产的像素坐标。 */
 export interface TextureCoords {
   x: number
   y: number
@@ -9,9 +10,7 @@ export interface TextureCoords {
 }
 
 /**
- *
- * Texture is the base data model since everything about these atlases is based
- * on 'rectangles of pixels data'.
+ * 图集纹理的数据模型：一切均以“像素矩形”为基础。
  */
 export class Texture {
   texture: ThreeTexture
@@ -32,8 +31,7 @@ export class Texture {
     this.assetSize = assetSize
   }
 
-  // returns the number of items max that the geometry must be able to draw
-  // ie : it will define the size of the geometry buffer
+  // 几何体需要能绘制的最大项数，即几何体缓冲的大小
   getNumItemsMax(): number {
     return this.coords.length
   }

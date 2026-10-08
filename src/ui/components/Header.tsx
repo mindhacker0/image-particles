@@ -3,12 +3,7 @@ import { useUiState } from '../store'
 import { uiNodes } from '../uiNodes'
 
 /**
- * Header markup, moved from `index.html`.
- *
- * The visibility classes (`.show`, `.opened`, `.selected`, `.is-active`) are
- * rendered from the UI store instead of being toggled with `classList`, and the
- * nodes are published through `uiNodes` for the parts of the engine that still
- * need DOM elements.
+ * 头部组件：由 UI state 控制显示状态，并把 DOM 节点暴露给引擎。
  */
 
 const NAV_ITEMS = [
@@ -23,8 +18,7 @@ export function Header() {
   const headerRef = useRef<HTMLElement>(null)
   const loaderRef = useRef<HTMLDivElement>(null)
 
-  // publish the nodes the legacy engine expects (`app_freefall.js` binds its
-  // click listeners to `ui.buttons`, `main.js` styles `ui.header_el`, ...)
+  // 暴露给引擎使用的 DOM 节点
   useEffect(() => {
     uiNodes.header = headerRef.current
     uiNodes.loader = loaderRef.current

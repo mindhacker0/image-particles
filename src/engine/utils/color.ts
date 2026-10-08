@@ -1,12 +1,10 @@
-/**
- * Ported from `js/utils/color_utils.js` (colour space and pixel helpers).
- */
+/** 颜色空间与像素辅助函数。 */
 
-/** Converts a hex string to a number, or a number back to a `#rrggbb` string. */
+/** 十六进制字符串与数字互转；数字会转成 `#rrggbb` 字符串。 */
 export function convertColor(color: number | string, toNumber?: boolean): number | string {
   if (toNumber === true) {
     if (typeof color === 'number') {
-      return (color | 0) // chop off decimal
+      return (color | 0) // 去掉小数部分
     }
     if (typeof color === 'string' && color[0] === '#') {
       color = color.slice(1)
@@ -15,12 +13,13 @@ export function convertColor(color: number | string, toNumber?: boolean): number
   }
 
   if (typeof color === 'number') {
-    // make sure our hexadecimal number is padded out
+    // 补足到 6 位十六进制
     color = '#' + ('00000' + (color | 0).toString(16)).substr(-6)
   }
   return color
 }
 
+/** RGB 分量转十六进制字符串。 */
 export function rgbToHex(r: number, g: number, b: number): string {
   if (r > 255 || g > 255 || b > 255) {
     throw 'Invalid color component'
@@ -28,7 +27,7 @@ export function rgbToHex(r: number, g: number, b: number): string {
   return ((r << 16) | (g << 8) | b).toString(16)
 }
 
-/** Reads a rectangular region out of an existing `Uint32Array` pixel buffer. */
+/** 从已有的 `Uint32Array` 像素缓冲中读取一块矩形区域。 */
 export function getImageDataFaster(
   x: number,
   y: number,
@@ -56,9 +55,8 @@ export function getImageDataFaster(
 }
 
 /**
- * Converts an HSL color value to RGB.
- * Assumes h, s and l are contained in the set [0, 1] and returns r, g and b in
- * the set [0, 255].
+ * HSL 转 RGB。
+ * 假定 h、s、l 在 [0, 1] 区间，返回的 r、g、b 在 [0, 255] 区间。
  */
 export function hslToRgb(h: number, s: number, l: number): [number, number, number] {
   let r: number
@@ -66,7 +64,7 @@ export function hslToRgb(h: number, s: number, l: number): [number, number, numb
   let b: number
 
   if (s === 0) {
-    r = g = b = l // achromatic
+    r = g = b = l // 无彩色
   } else {
     const hue2rgb = function hue2rgb(p: number, q: number, t: number) {
       if (t < 0) t += 1
@@ -88,9 +86,8 @@ export function hslToRgb(h: number, s: number, l: number): [number, number, numb
 }
 
 /**
- * Converts an RGB color value to HSL.
- * Assumes r, g and b are contained in the set [0, 255] and returns h, s and l in
- * the set [0, 1].
+ * RGB 转 HSL。
+ * 假定 r、g、b 在 [0, 255] 区间，返回的 h、s、l 在 [0, 1] 区间。
  */
 export function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
   r /= 255
@@ -104,7 +101,7 @@ export function rgbToHsl(r: number, g: number, b: number): [number, number, numb
   const l = (max + min) / 2
 
   if (max === min) {
-    h = s = 0 // achromatic
+    h = s = 0 // 无彩色
   } else {
     const d = max - min
     s = l > 0.5 ? d / (2 - max - min) : d / (max + min)

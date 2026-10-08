@@ -17,37 +17,20 @@ import { MetaDataMaterial } from './MetadataMaterial'
 import { lod } from './lod/lod'
 
 /**
- * Ported from `js/atlas/metadatas.js`.
- *
- * Utility that shows some metadata of assets nearby: one `MetadataLabel` per
- * visible asset, drawn into a canvas texture (`MetaDataMaterial`).
- *
- * Port notes:
- * - `Mesh` is three's own `Mesh`, imported from `three` (NOT the ported
- *   `atlas/Mesh.ts` tile class), and `PlaneBufferGeometry` became `PlaneGeometry`.
- * - The three `labelLink*ImageLoaded` globals were plain booleans flipped by
- *   their image's `onload`. A plain `export let` would only be published as the
- *   initial `false` snapshot, so they are exported as small mutable holders
- *   (same names, live state); readers here use `labelLinkImageLoaded.value`.
- * - `this.labelIdsLod` is used as an ARRAY although the name suggests a
- *   dictionary: the legacy code kept a per-LOD dictionary version commented out
- *   and pushes every visible asset id, so the array behaviour is kept.
- * - Globals still owned by classic scripts (`renderNeeded`, `hideMetadata`,
- *   `tempCnvs`, `getItem`, `cameraControls.gotoAsset`, `app.currentColor`) are
- *   read at call time through small typed getters at the end of this file.
+ * 元数据标签模块：为附近可见的资产各生成一个 `MetadataLabel`，
+ * 并将标题 / 作者等信息绘制到 canvas 纹理上（由 `MetaDataMaterial` 使用）。
  */
 
 /* ------------------------------------------------------------------------- *
- * Link icons drawn into the label canvas
+ * 绘制到标签 canvas 上的链接图标
  * ------------------------------------------------------------------------- */
 
 export const imageLabelLinkObj = new Image()
 export const imageLabelAndroidLinkObj = new Image()
 
 /**
- * Legacy link image loaded flags. The `onload` callbacks below mutate them, so
- * they are exposed as mutable holders to keep the live state shareable (the
- * legacy readers were all inside this very file).
+ * 链接图标的加载状态。`onload` 回调会修改它们，
+ * 因此用可变对象持有，读取时通过 `.value` 获取。
  */
 export const labelLinkImageLoaded = { value: false }
 export const labelLinkAndroidImageLoaded = { value: false }
@@ -61,19 +44,17 @@ imageLabelAndroidLinkObj.onload = function () {
 imageLabelLinkObj.src = 'imgs/ic_open_in_new.png'
 imageLabelAndroidLinkObj.src = 'imgs/ic_smartphone.png'
 
-/*
- * Utility that shows some metadata of assets nearby
- */
+/** LOD 迭代计数。 */
 export let lodIteration = 0
 
-/** The parts of an atlas asset this module reads (see `js/atlas/asset.js`). */
+/** 本模块所需的图集资产字段。 */
 export interface MetadataAsset {
   id: string
   coords: { x: number; y: number; w: number; h: number }
   position: Vector3
 }
 
-/** The parts of `Model.items[id]` (see `js/data/models.js`) this module reads. */
+/** 本模块所需的 `Model.items[id]` 字段。 */
 export interface MetadataItem {
   id: string
   title?: string
@@ -86,7 +67,7 @@ export interface MetadataItem {
   [key: string]: unknown
 }
 
-/** A clickable rectangle of the label canvas. */
+/** 标签 canvas 上一个可点击的矩形区域。 */
 interface LabelRect {
   x: number
   y: number
@@ -94,7 +75,7 @@ interface LabelRect {
   h: number
 }
 
-/** Result of `MetadataLabel.click()`; `atlas.hitLabel` switches on `type`. */
+/** `MetadataLabel.click()` 的返回值；`atlas.hitLabel` 依据 `type` 分支处理。 */
 export interface MetadataHit {
   asset: MetadataAsset
   url?: string
@@ -102,19 +83,20 @@ export interface MetadataHit {
   title?: string | null
 }
 
-/** Payload of the `lod` `update` event (`lod.events.dispatch('update', { assets })`). */
+/** `lod` 的 `update` 事件负载（`{ assets }`）。 */
 export interface LODUpdateEvent {
   assets: Record<string, string[]>
 }
 
 type LodInstance = typeof lod
 
+/** 收集并更新各资产的元数据标签。 */
 export class LODMetadatas {
   lod: LodInstance
   labels: MetadataLabel[]
   /**
-   * NOTE: an ARRAY despite the `*Lod` name (see the header note); the legacy
-   * code had the per-LOD dictionary version commented out.
+   * 注意：尽管名字带 `Lod`，实际是数组。
+   * 它保存所有可见资产的 id，而非按 LOD 分组的字典。
    */
   labelIdsLod: string[]
   container: Object3D
@@ -128,8 +110,6 @@ export class LODMetadatas {
     this.container = new Object3D()
     this.asset = null
     this.lodUpdateHandler = this.onLODUpdate.bind(this)
-    // the legacy call passed a third `false` (useCapture) argument that the
-    // ported EventDispatcher does not take
     this.lod.events.addListener('update', this.lodUpdateHandler)
   }
 
@@ -138,9 +118,8 @@ export class LODMetadatas {
 
     for (let i = 0; i < l; i++) {
       this.labels[i].updatePosition()
-      //this.labels[i].quaternion.copy(camera.quaternion);
 
-      //hides the labels for the freefall intro
+      // 自由落体片头时隐藏标签
       if (hideMetadata()) {
         this.labels[i].material.uniforms.alpha.value = 0
       }
@@ -156,7 +135,7 @@ export class LODMetadatas {
       }
     }
 
-    //check if the labels are fading in or out and forces the render if need be
+    // 检测标签是否正在淡入淡出，必要时强制渲染
     let render: boolean = getRenderNeeded()
     let alpha: number = NaN
 
@@ -169,28 +148,20 @@ export class LODMetadatas {
         }
       }
     }
-    // console.log( "meta", renderNeeded, render, this.labels.length, alpha );
     setRenderNeeded(render)
   }
 
   /*
-   * LOD update handler, add new items and remove unused
+   * LOD 更新回调：添加新标签并移除不再使用的标签
    */
   onLODUpdate(event: LODUpdateEvent): void {
-    //uses the closest item range to display a label
-    // var lod = atlas.lod.lods.length == 1 ? 0 : 1;
-    // var lodLimit = atlas.lod.lods[lod].mesh.assetSize;
-    // NOTE: this reads the global `lod` (the module singleton), exactly like the
-    // legacy code did: `this.lod` is only used to subscribe/unsubscribe.
+    // 使用最近一级的资产范围来显示标签
+    // 注意：这里读取的是模块单例 `lod`，`this.lod` 仅用于事件的订阅 / 取消订阅
     let lodLimit = lod.minimumLODResolution
 
     if (legacyParams().isBigWallVersion) {
       lodLimit = 1024
     }
-
-    // **** no labels on wave formula // buggy => update using wavesOffset + wavesOffset
-    // if (app.chapters.currentChapter && app.chapters.currentChapter.currentSequenceId == "wave")
-    //     event.assets = [];
 
     this.labelIdsLod = []
 
@@ -199,32 +170,23 @@ export class LODMetadatas {
     }
 
     for (const assets in event.assets) {
-      // console.log( assets, lodLimit, assets >= lodLimit);
-      // the legacy `assets >= lodLimit` compared the (string) LOD size key with
-      // the numeric limit and relied on the `>=` coercion -> `Number(assets)`
-      // makes that explicit (a non numeric key was and stays false).
+      // 键是字符串形式的 LOD 尺寸，这里显式转为数字再比较（非数字键结果为 false）
       if (Number(assets) >= lodLimit) {
-        //creates an label array for each LOD
-        // this.labelIdsLod[ assets ] = this.labelIdsLod[ assets ] || [];
-
         for (const assetId of event.assets[assets]) {
-          // this.labelIdsLod[ assets ].push( assetId );
           this.labelIdsLod.push(assetId)
           this.addAssetLabel(assetId)
         }
       }
     }
-    // console.log( this.labelIdsLod )
   }
 
   addLabel(assetId: string): void {
     const atlas = legacyAtlas()
     const asset = atlas.getAsset(assetId)
 
-    //TODO fix: shouldn't be null
     if (asset == null) return
 
-    //highlights existing labels
+    // 已存在同名标签则高亮它，否则新建
     let i = 0
     for (i = 0; i < this.labels.length; i++) {
       if (this.labels[i].name == assetId) {
@@ -232,39 +194,12 @@ export class LODMetadatas {
         return
       }
     }
-    /*
-    var meshes = atlas.getAssetMeshes(assetId);
-    if (!meshes) return;
-    // check if this is the highest resolution available
-    var resolution = 0;
-    for (var meshPos = 0; meshPos < meshes.length; meshPos++ ){
-        resolution = Math.max( resolution, meshes[meshPos].texture.assetSize );
-    }
-    if( this.labelIdsLod[ resolution ] == null )return;
-    if (this.labelIdsLod[ resolution ].indexOf(assetId) == -1 )return;
-    //*/
-
     if (this.labelIdsLod.indexOf(assetId) == -1) return
 
-    //var mesh = atlas.getAssetMeshes(assetId)[0].mesh;
-    // get position offset
     const asset32pxFactor = 1
     const assetSize = new Vector2(asset.coords.w * asset32pxFactor, asset.coords.h * asset32pxFactor)
-    // console.log('           ---- ADD LABEL : '+assetId+' --- ');
-    // if ( ( asset.fullRes.x == 0 ) || ( asset.fullRes.y == 0 ) ) {
-    //     //console.log( "asset full res still unknown..." );
-    //     // return;
-    //
-    //     assetSize = new THREE.Vector2(asset.coords.w * asset32pxFactor, asset.coords.h * asset32pxFactor);
-    //
-    // } else {
-    //     assetSize = new THREE.Vector2(
-    //         map(asset.fullRes.x, 0, atlas.lod.lods[0].textureSize, 0, 16),
-    //         map(asset.fullRes.y, 0, atlas.lod.lods[0].textureSize, 0, 16)
-    //     );
-    // }
 
-    // create label
+    // 创建标签
     const label = new MetadataLabel(
       modelItems()[assetId] as unknown as MetadataItem,
       assetSize,
@@ -273,7 +208,6 @@ export class LODMetadatas {
     )
     this.container.add(label)
     this.labels.push(label)
-    // console.log( label )
   }
 
   onMetadata(metadata: MetadataItem): void {
@@ -284,10 +218,8 @@ export class LODMetadatas {
     const item = modelItems()[assetId] as unknown as MetadataItem | undefined
 
     if (item && item.updated == true) {
-      // console.log( "addAssetLabel", assetId, Model.items[assetId] );
       this.addLabel(assetId)
     } else {
-      // console.log( "getItem", assetId, assetId );
       legacyGetItem()(assetId, this.onMetadata.bind(this))
     }
   }
@@ -314,23 +246,23 @@ export class LODMetadatas {
   }
 }
 
-/*
- * Utility that shows some metadata of assets nearby
- */
+/** 将相机跳转到指定资产。 */
 export function gotoAsset(id: string): void {
   currentCameraControls().gotoAsset(legacyAtlas().getAssetsFromIds([id])[0])
 }
-// var geometrySc = new THREE.PlaneGeometry(1, 1 );
+/**
+ * 单个元数据标签：绘制标题 / 作者等信息，
+ * 并处理点击命中与淡入淡出。
+ */
 export class MetadataLabel extends Mesh {
   /**
-   * The label always uses the shader material built by `MetaDataMaterial`.
-   * `declare` on purpose: a real field would be defined AFTER `super()` and
-   * would wipe the material three's `Mesh` constructor just stored.
+   * 标签固定使用 `MetaDataMaterial` 构建的 shader 材质。
+   * 必须用 `declare`：若声明为真实字段，会在 `super()` 之后赋值，
+   * 覆盖 three 的 `Mesh` 构造函数刚存入的材质。
    */
   declare material: ShaderMaterial
 
   asset: MetadataAsset
-  /** legacy typo kept (`canvasSizeDiviser`) */
   canvasSizeDiviser: number
   size: number
   data: MetadataItem
@@ -355,14 +287,13 @@ export class MetadataLabel extends Mesh {
 
   constructor(data: MetadataItem, assetSize: Vector2, assetPosition: Vector3, asset: MetadataAsset) {
     let size = 512
-    const canvasSizeQuality = 2 // 2 => 1024;
+    const canvasSizeQuality = 2 // 2 表示 1024
     size = size * canvasSizeQuality
     let canvasHDiviser = 1
 
-    // CANVAS ---------------------------------------------------
-    // ********* DRAW METADATA PANEL ******************
-    // using one big temp canvas
-    // (the legacy code created it once and cached it on `window.tempCnvs`)
+    // 画布 ---------------------------------------------------
+    // ********* 绘制元数据面板 ******************
+    // 使用一块较大的临时 canvas（只创建一次并复用）
     let tempCnvs = getTempCanvas()
     if (!tempCnvs) {
       tempCnvs = document.createElement('canvas')
@@ -378,7 +309,7 @@ export class MetadataLabel extends Mesh {
     else if (created)
       date = created as number
 
-    // parameters
+    // 参数
     const padding = 10 * canvasSizeQuality
     const linkRadius = 16 * canvasSizeQuality
     let linkX = 0
@@ -388,7 +319,7 @@ export class MetadataLabel extends Mesh {
     let ctx = tempCnvs.getContext('2d')
     const canvasBaseY = 0
 
-    // fill canvas
+    // 填充 canvas
     ctx.beginPath()
     ctx.fillStyle = 'white'
     ctx.rect(0, canvasBaseY, tempCnvs.width, tempCnvs.height)
@@ -396,7 +327,7 @@ export class MetadataLabel extends Mesh {
 
     ctx.beginPath()
 
-    // draw text
+    // 绘制文字
     ctx.fillStyle = 'black'
 
     const x = 10 * canvasSizeQuality + padding
@@ -405,8 +336,6 @@ export class MetadataLabel extends Mesh {
     let titleRectLineOne: LabelRect | null = null
     let titleRectLineTwo: LabelRect | null = null
     let titleRectAuthor: LabelRect | null = null
-    // the legacy `var partnerRect` was hoisted out of the `if (data.partner)`
-    // block below and tested with `if (partnerRect)` when copying it on `this`
     let partnerRect: LabelRect | null = null
 
     y = topbottomPadding
@@ -423,7 +352,7 @@ export class MetadataLabel extends Mesh {
         let line = ''
         let numLines = 0
 
-        // first line - words
+        // 第一行：按单词逐个填充
         for (let i = 0; i < arrWords.length; i++) {
           if (ctx.measureText(line + arrWords[i] + ' ').width > maxTextW) {
             y += fontSize + padding
@@ -454,7 +383,7 @@ export class MetadataLabel extends Mesh {
             h: 28 * canvasSizeQuality,
           }
         } else {
-          // second line - ...
+          // 第二行：超出部分以省略号结尾
           let txtSecondLine = data.title.replace(line, '')
           if (ctx.measureText(txtSecondLine).width > maxTextW) {
             while (ctx.measureText(txtSecondLine + '...').width > maxTextW) {
@@ -492,8 +421,7 @@ export class MetadataLabel extends Mesh {
     let text = ''
     let pre_author = ''
     if (date && !isNaN(date as unknown as number)) {
-      // `date` is a year number or a Date: the legacy `(date<0)? -date+" BC" : date`
-      // is kept through casts (`String(date)` === the legacy `+ date` coercion).
+      // date 可能是年份数字或 Date：负数按公元前（BC）显示
       text += (date as unknown as number) < 0 ? -(date as unknown as number) + ' BC' : String(date)
       pre_author = ', '
     }
@@ -520,8 +448,7 @@ export class MetadataLabel extends Mesh {
         ? linkX - x - linkRadius * 4 - padding * 2 - 10 * canvasSizeQuality
         : tempCnvs.width - x - padding - 5 * canvasSizeQuality
       y += fontSize + padding
-      // the legacy value is a css colour string (or a `THREE.Color`, which the
-      // canvas stringifies): passed through unchanged
+      // 该值可能是 css 颜色字符串或 THREE.Color（canvas 会自动转成字符串）
       ctx.fillStyle = appCurrentColor() as string
       let partnerLabel = data.partner
       if (ctx.measureText(partnerLabel).width > maxPartnerTextW) {
@@ -531,7 +458,7 @@ export class MetadataLabel extends Mesh {
         partnerLabel += '...'
       }
       ctx.fillText(partnerLabel, x, y)
-      //keeps track of the rect for click test
+      // 记录矩形区域用于点击检测
       partnerRect = {
         x: x,
         y: y - 4 * canvasSizeQuality,
@@ -539,9 +466,9 @@ export class MetadataLabel extends Mesh {
         h: 15 * canvasSizeQuality,
       }
 
-      // underline
+      // 下划线
       ctx.rect(partnerRect.x, partnerRect.y + 6 * canvasSizeQuality, Math.min(partnerRect.w, maxPartnerTextW), 1)
-      // bigger click rect
+      // 放大点击区域
       partnerRect.x -= 1 * canvasSizeQuality
       partnerRect.y -= 4 * canvasSizeQuality
       partnerRect.w += 6 * canvasSizeQuality
@@ -557,7 +484,6 @@ export class MetadataLabel extends Mesh {
     linkAndroidX = linkX - linkRadius * 2 - padding
 
     if (!legacyParams().isBigWallVersion) {
-      //ctx.fillStyle = app.currentColor;
       ctx.fillStyle = '#dcdcdc'
       ctx.beginPath()
       ctx.arc(linkX + linkRadius, linkY + linkRadius, linkRadius, 0, Math.PI * 2)
@@ -575,16 +501,10 @@ export class MetadataLabel extends Mesh {
         ctx.drawImage(imageLabelAndroidLinkObj, linkAndroidX + 11 * canvasSizeQuality, linkY + 7 * canvasSizeQuality)
     }
 
-    // clear unused bg
-    //ctx.clearRect(0, y, tempCnvs.width, tempCnvs.height - y + 1);
-
     const bottomY = y
 
-    // calculate canvasHDiviser -- closest power of 2
+    // 计算 canvasHDiviser，取最接近的 2 的幂
     canvasHDiviser = Math.pow(2, Math.round(Math.log(tempCnvs.width / bottomY) / Math.log(2)))
-    //canvasHDiviser = 4;
-
-    //console.log(data.title+" : "+tempCnvs.width+" / "+bottomY+' /////// '+(tempCnvs.width/bottomY)+" ----- "+canvasHDiviser);
 
     const cnvs = document.createElement('canvas')
     cnvs.width = size
@@ -593,18 +513,12 @@ export class MetadataLabel extends Mesh {
 
     ctx.drawImage(tempCnvs, 0, 0, tempCnvs.width, bottomY, 0, 0, cnvs.width, cnvs.height)
 
-    // END -- CANVAS ---------------------------------------------------
+    // 绘制结束 ---------------------------------------------------
 
     const texture = new Texture(cnvs)
     texture.needsUpdate = true
-    //texture.magFilter = THREE.NearestFilter;
-    //texture.minFilter = THREE.LinearMipMapLinearFilter;
     const material = MetaDataMaterial.getMaterial(texture)
-    //var material = new THREE.MeshBasicMaterial({color:0x2194ce, wireframe:true, side: THREE.DoubleSide, transparent:false, wireframeLinewidth:10});
-    //--------------------------------------------------------------------
-    // constructor !
     super(new PlaneGeometry(assetSize.x, assetSize.x / canvasHDiviser), material)
-    // ------------------------------------------------------------------
     this.asset = asset
     this.name = data.id
     this.canvasSizeDiviser = canvasHDiviser
@@ -613,18 +527,11 @@ export class MetadataLabel extends Mesh {
 
     this.scale.y = bottomY / cnvs.height
 
-    //this.mesh = mesh;
     this.canvasH = assetSize.x / canvasHDiviser
     this.assetSize = assetSize
     this.assetPosition = assetPosition
-    //+= lerp(1 / 1024, 0, 32); + one pixel
-    //this.positionOffset = lerp(2 / 1024, 0, 32) -this.canvasH * 0.5 * this.scale.y - this.assetSize.y * 0.5;
-    // issues with the one pixel offset (overlapping image on the sphere for exemple)
+    // 曾尝试再加 1 像素偏移，但在球面上会导致图像重叠，故不加
     this.positionOffset = -this.canvasH * 0.5 * this.scale.y - this.assetSize.y * 0.5
-
-    //this.position.z += .1;
-    //this.position.copy(this.assetPosition.clone());
-    //this.position.y += this.positionOffset;
 
     this.canvas = cnvs
     this.canvasW = this.assetSize.x
@@ -653,6 +560,7 @@ export class MetadataLabel extends Mesh {
 
   fadeIn(): void {
     this.isOut = false
+    // 先取消同一属性上的其它补间，避免残留的淡出把标签重新拉暗
     gsap.killTweensOf(this.material.uniforms.alpha)
     gsap.to(this.material.uniforms.alpha, {
       duration: 0.6,
@@ -661,10 +569,10 @@ export class MetadataLabel extends Mesh {
   }
 
   fadeOut(): void {
-    // LATENT BUG kept as-is: `isOut` is set instantly (instead of in
-    // `onFadeOutComplete`), so `LODMetadatas.update()` disposes the label on the
-    // next frame and the 0.6s fade-out tween never plays.
+    // 保留的历史问题：这里立即设置 `isOut`（而非在 `onFadeOutComplete` 中设置），
+    // 导致 `LODMetadatas.update()` 在下一帧就销毁该标签，0.6 秒的淡出补间不会播放。
     this.isOut = true
+    // 先取消残留补间，避免与淡入冲突
     gsap.killTweensOf(this.material.uniforms.alpha)
     gsap.to(this.material.uniforms.alpha, {
       duration: 0.6,
@@ -685,6 +593,7 @@ export class MetadataLabel extends Mesh {
     else return false
   }
 
+  /** 命中检测：把世界坐标换算到标签局部坐标后判断命中的区域。 */
   click(point: Vector3): MetadataHit {
     const local = this.worldToLocal(point.clone())
 
@@ -710,7 +619,7 @@ export class MetadataLabel extends Mesh {
 
     test = this.testClickRect(clickX, clickY, this.partnerRect)
     if (test) {
-      const needle = this.data.partner_url.toLowerCase() //.replace( / /gi, '-' ).replace( /[&,.()]/gi, '' );
+      const needle = this.data.partner_url.toLowerCase()
       return {
         type: 'external',
         url:
@@ -743,11 +652,6 @@ export class MetadataLabel extends Mesh {
         type: 'app',
         asset: this.asset,
       }
-      /*return {
-          url: "http://play.google.com/store/apps/details?id=com.google.android.apps.cultural",
-          type: "external",
-          asset:this.asset
-      };*/
     }
     return { asset: this.asset }
   }
@@ -759,29 +663,22 @@ export class MetadataLabel extends Mesh {
 
     mat.uniforms.map.value.dispose()
     mat.dispose()
-
-    // console.log( 'dispose', renderer.info.memory );
   }
 
+  /** 更新标签位置与朝向，使其始终正对相机。 */
   updatePosition(): void {
     this.position.copy(this.assetPosition.clone())
     this.translateY(this.positionOffset)
     this.quaternion.copy(metadataCamera().quaternion)
-    //this.position.z -= 0.1;
-
-    //this.quaternion.copy(camera.quaternion);
-    //var upVecNorm = upVec.clone().normalize();
-    //this.position.copy(this.assetPosition.clone().add(upVecNorm.multiplyScalar((-this.canvasH * 0.5 - this.assetSize.y * 0.5))));
   }
 }
 
 /* ------------------------------------------------------------------------- *
- * Legacy globals still owned by the classic scripts.
- * They are read at call time: they do not exist yet while this module is
- * evaluated / imported.
+ * 延迟读取的共享状态访问器：这些值在本模块被求值时还不存在，
+ * 因此只在调用时通过下面的函数读取。
  * ------------------------------------------------------------------------- */
 
-/** `renderNeeded` (set by `Main.animate`): true when a frame has to be rendered. */
+/** `renderNeeded`：为 true 时需要渲染一帧。 */
 function getRenderNeeded(): boolean {
   return shared.renderNeeded
 }
@@ -790,12 +687,12 @@ function setRenderNeeded(value: boolean): void {
   shared.renderNeeded = value
 }
 
-/** `hideMetadata`, owned by `Main`. */
+/** 是否隐藏元数据标签（自由落体片头时为 true）。 */
 function hideMetadata(): boolean {
   return shared.hideMetadata
 }
 
-/** scratch canvas the first label creates. */
+/** 首个标签创建的临时画布，供后续标签复用。 */
 let tempCanvas: HTMLCanvasElement
 
 function getTempCanvas(): HTMLCanvasElement {
@@ -806,22 +703,22 @@ function setTempCanvas(canvas: HTMLCanvasElement): void {
   tempCanvas = canvas
 }
 
-/** `getItem` of the model layer (`data/Models`). */
+/** 模型层的 `getItem`。 */
 function legacyGetItem(): (id: string, callback: (item: unknown) => void) => void {
   return getItem as unknown as (id: string, callback: (item: unknown) => void) => void
 }
 
-/** `cameraControls`; `gotoAsset` is called on it. */
+/** 相机控制器；此处调用其 `gotoAsset`。 */
 function currentCameraControls(): { gotoAsset(asset: unknown): void } {
   return cameraControls as unknown as { gotoAsset(asset: unknown): void }
 }
 
-/** `app.currentColor` (a css string or a `THREE.Color`). */
+/** `app.currentColor`（css 颜色字符串或 THREE.Color）。 */
 function appCurrentColor(): unknown {
   return (app as unknown as { currentColor: unknown }).currentColor
 }
 
-/** `atlas` (`js/atlas/atlas.js`) as this module uses it. */
+/** 本模块用到的图集接口。 */
 interface MetadataAtlas {
   getAsset(id: string): MetadataAsset | null
   getAssetsFromIds(ids: string[]): MetadataAsset[]
@@ -831,7 +728,7 @@ function legacyAtlas(): MetadataAtlas {
   return atlasInstance() as unknown as MetadataAtlas
 }
 
-/** `camera` (`js/main.js`): the legacy code only reads its `quaternion` here. */
+/** 相机；此处只读取其 `quaternion`。 */
 function metadataCamera(): { quaternion: Quaternion } {
   return legacyCamera() as unknown as { quaternion: Quaternion }
 }

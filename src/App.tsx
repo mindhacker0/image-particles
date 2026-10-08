@@ -16,9 +16,8 @@ const errorBannerStyle: React.CSSProperties = {
 }
 
 /**
- * React owns the application shell. The original page markup still lives in
- * `index.html` (the legacy UI code looks it up by class name), so this
- * component's job is the engine lifecycle and surfacing startup failures.
+ * React 负责应用外壳。页面结构仍写在 `index.html` 中（UI 代码按类名查找元素），
+ * 因此本组件的职责是管理引擎生命周期并展示启动失败信息。
  */
 export default function App() {
   const [status, setStatus] = useState<EngineStatus>('loading')
@@ -33,10 +32,8 @@ export default function App() {
       setStatus('error')
     }
 
-    // The legacy engine reports failures as uncaught script errors rather than
-    // through promises, so both channels are surfaced in the banner. Errors from
-    // third-party scripts (asset CDNs, for example) are only logged: they must
-    // not be reported as an engine failure.
+    // 引擎的失败可能以未捕获的脚本错误出现，而不一定走 promise，因此两个通道都要
+    // 展示到横幅上。第三方脚本（如资源 CDN）的错误只记录日志，不算引擎失败。
     const onError = (event: ErrorEvent) => {
       const source = event.filename || ''
       const isOwnScript = source === '' || source.startsWith(window.location.origin)
@@ -60,8 +57,8 @@ export default function App() {
     loadLegacyEngine()
       .then(() => {
         if (!active) return
-        // A script can load successfully and still throw while executing, so a
-        // reported error must not be cleared by a later "loaded" event.
+        // 脚本加载成功也可能在执行时抛错，因此后续的“加载完成”不应清除已报告的
+        // 错误状态。
         setStatus((current) => (current === 'error' ? current : 'ready'))
       })
       .catch((cause: unknown) => {

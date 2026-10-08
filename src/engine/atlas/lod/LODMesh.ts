@@ -6,10 +6,7 @@ import type { ImageDescriptor } from './helpers/ImageDescriptor'
 import type { LODDescriptor } from './helpers/LODDescriptor'
 
 /**
- *
- * Mesh of one level of detail: holds the LOD geometry and the shared atlas
- * material. The legacy prototype methods (`append`, `clear`, `reset`, `update`)
- * keep their names.
+ * 某一细节层级的网格：持有 LOD 几何体与共享的图集材质。
  */
 
 export class LODMesh {
@@ -47,6 +44,6 @@ export class LODMesh {
   }
 
   update(): void {
-    //TODO update attributes
+    // TODO：更新属性
   }
 }

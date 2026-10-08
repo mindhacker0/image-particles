@@ -23,42 +23,21 @@ import { Texture } from './Texture'
 import type { Asset } from './Asset'
 
 /**
- *
- * The atlas owns the static (pre-rendered) texture tiles, the LOD orchestrator,
- * the metadata labels and the asset lookup dictionaries every formula goes
- * through (`getAsset`, `getAssetsFromIds`, `getOldestAsset`).
- *
- * Notes on the non-obvious parts:
- * - Everything the original reached for through a global is now an import
- *   (`lod`, `LODMetadatas`, `Texture`, `Mesh`, `JSONLoader`, `Model`, `gsap`,
- *   `dateLabels`). The module only reads the `atlas` global itself for
- *   `datesMaterial` (assigned by `js/atlas/dateLabels.js`) plus the render loop
- *   globals owned by `js/main.js` (`rendererWidth`, `rendererHeight`) and `app`.
- * - `this.meshes` is handed to `lod.init`, which appends one `LODMesh` per level
- *   of detail, so the array holds the static `Mesh` tiles *and* the `LODMesh`
- *   tiles: it is typed `AtlasMesh[]` and narrowed where a static-tile-only member
- *   (`transitionPct`) is used. `getTransitionPct` skips them through their `type`.
- * - `loadCoords` decodes a fixed 21 byte record per asset:
- *   `char[14] id, byte a, ushort x, ushort y, byte w, byte h` in little endian.
- * - `count`, `jsonLoader`, `fogDistance`, the `mouse`/`raycaster` label picking
- *   and the whole `setFogColor`/`setFogDistance` pair are legacy leftovers: they
- *   are kept with their original names and behaviour even though this snapshot
- *   no longer uses most of them (`setFogColor` / `setFogDistance` are disabled by
- *   the early `return` the original left in).
+ * 图集管理器：负责静态纹理切片、LOD、元数据标签和资产索引。
  */
 
-/** Base url of the pre-rendered atlases (was a Google storage bucket). */
+/** 预渲染图集的基础路径。 */
 export const STATIC_API = 'data'
 
-/** Legacy counter, only ever read by the commented out `console.log` below. */
+/** 保留的计数器。 */
 export let count = 0
 
 export const textureLoader = new TextureLoader()
 
-/** One rectangle of pixels of an atlas, as decoded from the `.bin` coords file. */
+/** 从 `.bin` 坐标文件中解码出的单个图块矩形。 */
 export interface AtlasCoords {
   id: string
-  /** padding byte, never used */
+  /** 填充字节，未使用。 */
   a: number
   x: number
   y: number
@@ -66,10 +45,10 @@ export interface AtlasCoords {
   h: number
 }
 
-/** What `loadStatic` resolves with: the texture, its coords and the base asset size. */
+/** `loadStatic` 返回的内容：纹理、坐标和基础尺寸。 */
 export type AtlasStaticData = [ThreeTexture, AtlasCoords[], number]
 
-/** Options of the `Atlas` constructor (`js/main.js` `params`). */
+/** Atlas 构造参数。 */
 export interface AtlasOptions {
   showDebug?: boolean
   assetSize?: number
@@ -81,35 +60,31 @@ export interface AtlasOptions {
 }
 
 /**
- * The params object `loadAllStatics` builds out of its options and hands to
- * `loadNextStatic` (defaults filled in, progress/complete callbacks attached).
+ * `loadAllStatics` 构造、传递给 `loadNextStatic` 的参数。
  */
 export interface StaticAtlasParams {
   assetSize?: number
   atlasSize?: number
   numAtlasMax?: number
   maxAssetPerAtlas?: number | null
-  /** dead legacy field: written but never read back (see `loadAllStatics`) */
+  /** 无效字段：仅写入、从不读取（见 `loadAllStatics`）。 */
   coordsPath?: string
   onComplete?: () => void
   onProgress?: (pct: number) => void
 }
 
-/**
- * A tile mesh of the atlas: a static `Mesh` tile or one of the `LODMesh` tiles
- * `lod.init` appends to `atlas.meshes`.
- */
+/** 图集中的网格类型：静态 `Mesh` 或 `LODMesh`。 */
 export type AtlasMesh = Mesh | LODMesh
 
 export class Atlas {
   opts: AtlasOptions
   container: Group
   jsonLoader: JSONLoader
-  // array with all the assets currently available in the atlas
+  // 当前图集中的所有资产
   assets: Asset[]
-  // array with all the assets' meshes
+  // 每个资产对应的网格实例
   meshes: AtlasMesh[]
-  // dictionary to retrieve the current mesh list of a specific asset id
+  // 按 asset id 索引的网格数组
   meshesPerAssetId: Record<string, Mesh[]>
 
   lod: typeof lod
@@ -119,35 +94,22 @@ export class Atlas {
   mouse: Vector3
   raycaster: Raycaster
 
-  //set from : js/atlas/dateLabels.js init() method when a timeline is created
+  // 在时间线初始化后由 `dateLabels` 填充
   datesMaterial: ShaderMaterial | null
 
   constructor(opts?: AtlasOptions) {
     this.opts = opts || {}
     this.container = new Group()
     this.jsonLoader = new JSONLoader()
-    // array with all the assets currently available in the atlas
     this.assets = []
-    // array with all the assets' meshes
     this.meshes = []
-    // dictionary to retrieve the current mesh list of a specific asset id
     this.meshesPerAssetId = {}
 
-    // level of detail loads higher resolution textures
-    // for the assets that are close to the camera
-    // this.lod = new LOD( null, opts.showDebug);
-    // for (var lodDesc of this.lod.lods) {
-    //     this.addMesh(lodDesc.mesh);
-    // }
-
-    //new version
+    // LOD（细节层次）为靠近相机的资产加载更高分辨率的纹理
     this.lod = lod
     lod.init(null, this.container, this.meshes, this.opts.showDebug)
 
-    // mesh on demand - loads new images in atlas
-    // this.mod = new MOD();
-    // this.addMesh(this.mod.mesh);
-    // metadatas automatic labels
+    // 元数据自动标签
     this.mdLabels = new LODMetadatas(lod)
     this.container.add(this.mdLabels.container)
 
@@ -155,7 +117,7 @@ export class Atlas {
     this.mouse = new Vector3()
     this.raycaster = new Raycaster()
 
-    //set from : js/atlas/dateLabels.js init() method when a timeline is created
+    // 时间线初始化时补充
     this.datesMaterial = null
   }
 
@@ -170,7 +132,7 @@ export class Atlas {
 
   raycastMetadata(mousex: number, mousey: number, click: boolean): MetadataAsset | null {
     if (this.mdLabels.container.children.length) {
-      // the labels are `MetadataLabel` meshes patched with a `click` method
+      // 这些标签是附加了 `click` 方法的 `MetadataLabel` 网格
       const sprites = this.mdLabels.container.children as MetadataLabel[]
 
       let delta = 0
@@ -182,7 +144,7 @@ export class Atlas {
       this.mouse.x = ((mousex - delta) / rendererWidth()) * 2 - 1
       this.mouse.y = -(mousey / rendererHeight()) * 2 + 1
 
-      // `mouse` stays a Vector3 like in the original: the raycaster only reads x/y
+      // `mouse` 保持为 Vector3：raycaster 只会读取其中的 x / y
       this.raycaster.setFromCamera(
         this.mouse as unknown as Vector2,
         legacyCamera() as unknown as PerspectiveCamera,
@@ -191,14 +153,12 @@ export class Atlas {
       const intersects = this.raycaster.intersectObjects<MetadataLabel>(sprites)
 
       if (intersects.length) {
-        // the original hoisted this `var` out of the loop and returned it below
         let asset: MetadataAsset | true | null = null
         for (let i = 0; i < intersects.length; i++) {
           asset = this.hitLabel(intersects, i, click)
           if (asset) return asset == true ? null : asset
         }
-        // after the loop `asset` is always falsy (a truthy hit returns right
-        // away), so `null` is returned instead of the raw (falsy) value
+        // 循环结束后 `asset` 必然为假值（命中为真会立即返回），故直接返回 null
         return null
       }
     }
@@ -212,11 +172,7 @@ export class Atlas {
   ): MetadataAsset | true | null {
     const hit = intersects[i].object.click(intersects[i].point)
     const dist = intersects[i].distance
-    // legacy reads the `app` global in the two branches below
     const app = freefallApp()
-    /*if (hit && hit.type == "out")
-        return false;
-    else*/
     if (hit && dist > 70) {
       if (!click) return true
       else return hit.asset
@@ -239,72 +195,64 @@ export class Atlas {
     onComplete?: () => void,
     onProgress?: (pct: number) => void,
   ): void {
-    // no pre-rendered atlas is being used
+    // 未使用预渲染图集
     if (opts.numAtlasMax == 0) {
-      // FIX: the original called an undeclared `callback` here (the only
-      // callback in scope is `onComplete`), which threw a ReferenceError.
       if (onComplete) onComplete()
       return
     }
-    // retrieve options into a new params object that has default values
-    // and extras informations like progress/complete callbacks
+    // 将选项整理为带默认值的参数对象，并附加进度 / 完成回调
     const params: StaticAtlasParams = {}
     params.assetSize = opts.assetSize || 16
     params.atlasSize = opts.atlasSize || params.assetSize * 128
     params.numAtlasMax = opts.numAtlasMax || 10
     params.maxAssetPerAtlas = opts.maxAssetPerAtlas || null
-    // infer folder url
-    // params.folder = 'atlas_' + params.assetSize + '_' + params.atlasSize + '_artproject';
-    // add per-texture limits
+    // 设置单张纹理的资产上限
     if (params.maxAssetPerAtlas) {
-      // NOTE: latent bug kept as-is - `params.coordsPath` is never copied from
-      // `opts` and `loadNextStatic` rebuilds its own paths, so this
-      // concatenation is dead code (the limit is never applied). `String()`
-      // reproduces the original's "undefined&limit=N".
+      // 保留的历史问题：`params.coordsPath` 从未从 `opts` 复制，且 `loadNextStatic`
+      // 会重建自己的路径，因此这次拼接是死代码（上限从未生效）。
       params.coordsPath = String(params.coordsPath) + '&limit=' + params.maxAssetPerAtlas
     }
-    // add callbacks
+    // 记录回调
     params.onComplete = onComplete
     params.onProgress = onProgress
-    // start queue
+    // 启动加载队列
     this.loadNextStatic(0, params)
   }
 
   loadNextStatic(numLoaded: number, opts: StaticAtlasParams): void {
-    // infer textures & coords paths
+    // 推导纹理与坐标文件路径
     const texturePath = STATIC_API + '/atlas' + numLoaded + '.jpg'
     const coordsPath = STATIC_API + '/atlas' + numLoaded + '.bin'
-    // var coordsPath = STATIC_API + '/data/coords/atlas_' + numLoaded + '.json';
     const loader = this.loadStatic(texturePath, coordsPath, opts.assetSize)
-    // launch & handle promise's updates (the original used `.bind(this)`)
+    // 启动加载并处理 promise 结果
     loader.then((args) => {
-      // process loaded data
+      // 处理已加载的数据
       this.onStaticAtlasLoaded.apply(this, args)
-      // mark progress
+      // 更新进度
       numLoaded++
       if (opts.onProgress) {
         opts.onProgress(numLoaded / opts.numAtlasMax)
       }
-      // call onComplete callback if queue is complete
+      // 队列完成时调用完成回调
       if (numLoaded == opts.numAtlasMax) {
         if (opts.onComplete) {
           opts.onComplete()
         }
       }
-      // otherwise start loading next item
+      // 否则继续加载下一项
       else {
         this.loadNextStatic(numLoaded, opts)
       }
     })
   }
 
-  // add static (pre-rendered) atlas map by providing a texturePath and a coordsPath
-  // assetSize defines the base size of each asset in this texture
+  // 通过 texturePath 与 coordsPath 加载静态（预渲染）图集
+  // assetSize 定义该纹理中每个资产的基础尺寸
   loadStatic(texturePath: string, coordsPath: string, assetSize: number): Promise<AtlasStaticData> {
     const promise = new Promise<AtlasStaticData>((resolve) => {
-      // load texture
+      // 加载纹理
       const texture = textureLoader.load(texturePath, () => {
-        // load coords
+        // 加载坐标
         this.loadCoords(coordsPath, (data) => {
           resolve([texture, data, assetSize])
         })
@@ -321,7 +269,7 @@ export class Atlas {
       const arrayBuffer = xhr.response as ArrayBuffer
       const dv = new DataView(arrayBuffer)
       const MID_LENGTH = 14
-      const BYTES_PER_LINE = 21 // byte[MID_LENGTH],byte,ushort,ushort,char,char
+      const BYTES_PER_LINE = 21 // 记录布局：14 字节 id + 1 字节填充 + 2 个 ushort + 2 个 byte
       let off = 0
       const data: AtlasCoords[] = []
       const midbuffer = new ArrayBuffer(MID_LENGTH)
@@ -332,14 +280,11 @@ export class Atlas {
           miduint8[i] = dv.getUint8(off + i)
         }
         data.push({
-          // the original passed the Uint8Array straight to `fromCharCode.apply`:
-          // `Array.from` keeps the very same characters
+          // 将 14 个字节解析为 id 字符串
           id: String.fromCharCode.apply(null, Array.from(miduint8)),
           a: dv.getUint8(off + 14),
           x: dv.getUint16(off + 15, true) / 4,
           y: dv.getUint16(off + 17, true) / 4,
-          // FIX: the original passed a second `true` (little endian) argument to
-          // `getUint8`, which that method ignores; dropped here.
           w: dv.getUint8(off + 19) / 4,
           h: dv.getUint8(off + 20) / 4,
         })
@@ -352,10 +297,7 @@ export class Atlas {
   }
 
   onStaticAtlasLoaded(texture: ThreeTexture, datas: AtlasCoords[], assetSize: number): void {
-    // create mesh
-    // console.log( "mesh load", count++ )
-    // console.log(datas, assetSize)
-    // NOTE: the original shadowed its `texture` argument with the `Texture` wrapper
+    // 创建网格
     const atlasTexture = new Texture(texture, datas, assetSize)
     const mesh = new Mesh(atlasTexture)
     this.addMesh(mesh)
@@ -365,9 +307,8 @@ export class Atlas {
     this.container.add(mesh.mesh)
     this.meshes.push(mesh)
 
-    // TODO (@cdiagne): measure exec time of this - likely slow
-    // code below should have no impact on LOD / MOD since the init lod.assets
-    // dictionary is empty
+    // 注意：下面的遍历开销随资产数增长，可能较慢；
+    // 由于 LOD 初始化时 assets 字典为空，这里对 LOD / MOD 没有影响
     const assetIds = Object.keys(mesh.assets)
     let assetId
     for (let i = 0, l = assetIds.length; i < l; i++) {
@@ -375,25 +316,25 @@ export class Atlas {
       this.addAsset(assetId, mesh)
     }
 
-    // turn on render flag
+    // 标记需要渲染
     markRenderNeeded()
   }
 
   addAsset(assetId: string, mesh: Mesh): void {
     const meshesPerAssetId = this.meshesPerAssetId
     const assets = this.assets
-    // update global Model dict
+    // 补充 Model.items 中缺失的条目
     if (!Model.items[assetId]) {
       Model.items[assetId] = {}
     }
-    // update the meshes per assetId dictionary index
+    // 更新按 assetId 索引的网格列表
     meshesPerAssetId[assetId] = meshesPerAssetId[assetId] || []
     meshesPerAssetId[assetId].push(mesh)
-    // push asset to array
+    // 收集资产
     assets.push(mesh.assets[assetId])
   }
 
-  // returns an arraw of meshes where this asset is available
+  // 返回该资产所在的所有网格
   getAssetMeshes(id: string): Mesh[] {
     return this.meshesPerAssetId[id]
   }
@@ -401,17 +342,18 @@ export class Atlas {
   getAsset(id: string): Asset | null {
     const mesh = this.meshesPerAssetId[id]
     if (mesh) {
-      // return asset taken from lowest available resolution
+      // 返回分辨率最低的资产实例
       return mesh[0].assets[id]
     }
     return null
   }
 
+  /** 返回用于片头动画的代表资产。 */
   getOldestAsset(): Asset | null {
     return this.getAsset('PgFQ5eYVxWNuJA') || this.assets[2]
   }
 
-  // returns an array of assets from an array of assetIds
+  // 根据 assetId 数组返回资产数组
   getAssetsFromIds(ids: string[]): Asset[] {
     const result: Asset[] = []
     let asset
@@ -431,8 +373,7 @@ export class Atlas {
   skipAnimation(): void {
     this.update()
     for (const mesh of this.meshes) {
-      // only the static tiles own a `transitionPct`: writing it on the LOD tiles
-      // was harmless in the original as well
+      // 只有静态网格拥有 `transitionPct`，在 LOD 网格上写入同样无害
       ;(mesh as Mesh).transitionPct = 1
       mesh.update()
     }
@@ -440,46 +381,42 @@ export class Atlas {
 
   getTransitionPct(): number {
     let sum = 0
-    // var str = '';
     this.meshes.forEach(function (mesh) {
       if (mesh.type != 'mesh') return
       sum = Math.max(sum, (mesh as Mesh).transitionPct)
-      // str += mesh.transitionPct + ', ';
     })
-    // console.log( str, sum );
     return sum
   }
 
   update(): void {
-    // console.time('atlas.update');
     for (const mesh of this.meshes) {
       mesh.update()
     }
     this.mdLabels.update()
-    // the original read the global `atlas` here
     if (legacyAtlas().datesMaterial) {
       dateLabels.update()
     }
-    // console.timeEnd('atlas.update');
   }
 
   setFogColor(value: unknown): void {
+    // 暂时禁用：直接返回
     return
-    // particles fog color
+    // 粒子雾色
     for (const mesh of this.meshes) {
       mesh.material.material.uniforms.fogColor.value = value
     }
-    //dates' labels fog color
+    // 日期标签的雾色
     if (legacyAtlas().datesMaterial) {
       legacyAtlas().datesMaterial.uniforms.fogColor.value = value
     }
   }
 
   setFogDistance(value: number, duration?: number): void {
+    // 暂时禁用：直接返回
     return
     duration = duration || 1
 
-    // particles fog
+    // 粒子雾
     if (duration == 0) {
       for (const mesh of this.meshes) {
         mesh.material.material.uniforms.fogDistance.value = value
@@ -496,7 +433,7 @@ export class Atlas {
       }
     }
 
-    //dates' labels fog
+    // 日期标签的雾
     if (legacyAtlas().datesMaterial) {
       gsap.to(legacyAtlas().datesMaterial.uniforms.fogDistance, { duration, value: value })
     }
@@ -504,36 +441,35 @@ export class Atlas {
 }
 
 /* ------------------------------------------------------------------------- *
- * Legacy globals still owned by the classic scripts.
- * They are read at call time: they do not exist yet while this module is
- * evaluated / imported.
+ * 延迟读取的共享状态访问器：这些值在本模块被求值时还不存在，
+ * 因此只在调用时通过下面的函数读取。
  * ------------------------------------------------------------------------- */
 
-/** `rendererWidth` (set by `Main.initTHREE`). */
+/** 渲染器宽度。 */
 function rendererWidth(): number {
   return shared.rendererWidth
 }
 
-/** `rendererHeight` (set by `Main.initTHREE`). */
+/** 渲染器高度。 */
 function rendererHeight(): number {
   return shared.rendererHeight
 }
 
-/** The members of `app` (`js/apps/app_freefall.js`) this module reads. */
+/** 本模块用到的 `app` 字段。 */
 interface FreefallApp {
-  /** never assigned in this snapshot, but read by `js/main.js` too */
+  /** 当前不会被赋值，但外部仍会读取。 */
   editorPanel?: { opened: boolean; width: number; getWidth(): number } | null
   sideContent: {
     
   }
 }
 
-/** `app` (`js/apps/app_freefall.js`), extended with the members used above. */
+/** `app` 实例（补充了上面用到的字段）。 */
 function freefallApp(): FreefallApp | undefined {
   return legacyApp() as unknown as FreefallApp | undefined
 }
 
-/** `atlas` (`js/atlas/atlas.js`): this very class, published as a global. */
+/** 图集单例，即本类自身。 */
 function legacyAtlas(): Atlas {
   return atlasInstance() as unknown as Atlas
 }

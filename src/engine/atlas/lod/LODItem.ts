@@ -12,9 +12,8 @@ import { LODTexture } from './LODTexture'
 import type { LODAssetLike } from './types'
 
 /**
- *
- * Handles the loading and the display of the assets of one level of detail:
- * queues the images, rebuilds the LOD texture and swaps the mesh attributes.
+ * 处理某一细节层级（LOD）资产的加载与显示：
+ * 将图像加入队列、重建 LOD 纹理并切换网格属性。
  */
 export class LODItem {
   desc: LODDescriptor
@@ -25,13 +24,13 @@ export class LODItem {
   loaderPool: LoaderPool
   imagePool: ImagePool
 
-  // image descriptors that need to be committed to the texture
+  // 需要提交到纹理的图像描述符
   flushPool: ImageDescriptor[] = []
 
   texture: LODTexture
   mesh: LODMesh
 
-  // asset list
+  // 资产列表
   assets: LODAssetLike[] = []
 
   initialUpdate = true
@@ -47,29 +46,28 @@ export class LODItem {
     this.tileSize = desc.tileSize
     this.tileCount = desc.tileCount
 
-    // image loader pool
+    // 图像加载器池
     this.loaderPool = new LoaderPool(desc, Math.min(desc.tileCount, 8))
 
-    // monitor image loading
+    // 监听图像加载事件
     this.loaderPool.events.addListener(LoaderPool.IMAGE_LOADED, this.onImageLoaded.bind(this) as never)
     this.loaderPool.events.addListener(LoaderPool.IMAGE_ERROR, this.onImageError.bind(this) as never)
     this.loaderPool.events.addListener(LoaderPool.QUEUE_LOADED, this.onQueueLoaded.bind(this) as never)
 
-    // imagePool: a dictionary of the images that have already been loaded
-    // maximum amount of items that can be stored in cache
+    // imagePool：已加载图像的字典，此处设置缓存上限
     const cacheLimit = Math.max(8, this.tileCount * 2)
     this.imagePool = new ImagePool(cacheLimit)
 
-    // creates a texture
+    // 创建纹理
     this.texture = new LODTexture(desc)
 
-    // creates a mesh
+    // 创建网格
     this.mesh = new LODMesh(desc, this.texture.texture)
 
-    // adds mesh to stage
+    // 把网格加入场景
     container3D.add(this.mesh.mesh)
 
-    // and to the atlas' mesh pool
+    // 并加入图集的网格池
     atlasMeshes.push(this.mesh)
   }
 
@@ -102,10 +100,10 @@ export class LODItem {
   }
 
   onQueueLoaded(_loader?: unknown): void {
-    // the original only logged here
+    // 队列加载完成的通知入口，此处无需额外处理
   }
 
-  /// update
+  /// 更新
 
   update(newAssets: LODAssetLike[]): void {
     const scope = this
@@ -113,29 +111,28 @@ export class LODItem {
     this.assets = []
     this.flushPool = []
 
-    // LOAD
-    // list of the assets that need to be downloaded
+    // 加载
+    // 需要下载的资产列表
     const assetsToLoad: LODAssetLike[] = []
-    // lists of assets that don't have a url yet
+    // 尚无 URL 的资产列表
     const missingIds: string[] = []
 
-    // step1: load or display?
+    // 步骤 1：加载还是直接显示？
     newAssets.forEach(function (asset) {
-      // assigns this LOD level to the asset
+      // 把当前 LOD 层级赋给该资产
       if (asset.lod === scope.lod) {
-        // if this file hasn't been downloaded yet
+        // 该文件尚未下载
         if (scope.imagePool.get(asset.id) == null) {
-          // we'll have to load this
+          // 需要加入加载队列
           assetsToLoad.push(asset)
 
-          // if the asset has never been loaded (in another LOD) we need to find
-          // its image url
+          // 若该资产从未加载过（其他 LOD 也没有），需要查找它的图像 URL
           if (asset.image_url == null && asset.valid) {
-            // so we store the asset's id and send it to getUrlsDict(missingIds)
+            // 记录资产 id，交给 getUrlsDict(missingIds) 解析
             missingIds.push(asset.id)
           }
         } else {
-          // this image was already loaded: if the asset is valid
+          // 图像已加载：资产有效时直接使用
           if (scope.checkAsset(asset)) {
             scope.addAsset(asset)
           }
@@ -145,13 +142,13 @@ export class LODItem {
 
     this.load(assetsToLoad, missingIds)
 
-    // end step 1
+    // 步骤 1 结束
 
-    // step2: if there is still room in this texture
+    // 步骤 2：若该纹理仍有空位
     if (this.assets.length < this.tileCount) {
-      // promote any items of a lower LOD that exists in this cache
+      // 提升缓存中已有的低 LOD 项
       newAssets.forEach(function (asset) {
-        // this asset belongs to another LOD and was not processed
+        // 该资产属于其他 LOD，尚未处理
         if (asset.drawn) return
 
         if (asset.lod !== scope.lod) {
@@ -162,7 +159,7 @@ export class LODItem {
       })
     }
 
-    // displays the new assets
+    // 显示新资产
     this.mesh.reset(this.assets as unknown as Asset[])
     this.mesh.append(this.flushPool)
     this.imagePool.clean(this.desc.lod)
@@ -170,19 +167,19 @@ export class LODItem {
   }
 
   checkAsset(asset: LODAssetLike): boolean {
-    // already there
+    // 已在列表中
     if (this.assets.indexOf(asset) !== -1) return false
 
-    // already being drawn
+    // 正在绘制
     if (asset.drawn) return false
 
-    // not needed...
+    // 不需要显示
     if (!asset.needed) return false
 
-    // not enough room for it on the texture
+    // 纹理上没有足够空位
     if (this.assets.length > this.tileCount - 1) return false
 
-    // in cache?
+    // 是否已缓存？
     const imd = this.imagePool.get(asset.id)
     if (imd == null) return false
 
@@ -190,7 +187,7 @@ export class LODItem {
   }
 
   addAsset(asset: LODAssetLike): void {
-    // adds it
+    // 加入列表
     asset.drawn = true
     asset.needed = false
     this.assets.push(asset)
@@ -203,18 +200,18 @@ export class LODItem {
     const scope = this
 
     if (missingIds.length > 0) {
-      // finds the missing urls and loads the new images
+      // 查找缺失的 URL 并加载新图像
       const fromAllChannels = false
 
       getUrlsDict(
         missingIds,
         function () {
-          // the actual file urls are made available through Model.items[asset.id]
+          // 实际文件 URL 通过 modelItems()[asset.id] 提供
           assetsToLoad.forEach(function (asset) {
             const items = modelItems()
 
             if (items[asset.id] && items[asset.id].image_url) {
-              // stores a reference to the image's url in the asset
+              // 在资产上保存该图像 URL 的引用
               const atlasAsset = atlasInstance().getAsset(asset.id) as unknown as
                 | LODAssetLike
                 | undefined
@@ -222,7 +219,7 @@ export class LODItem {
                 atlasAsset.image_url = items[asset.id].image_url as string
               }
             } else {
-              // this asset has no image_url...
+              // 该资产没有 image_url
               if (asset.valid) {
                 console.warn('asset: ' + asset.id + ' has no image URL')
               }
@@ -230,22 +227,18 @@ export class LODItem {
             }
           })
 
-          // calls the load batch
+          // 执行这一批加载
           scope.loaderPool.load(assetsToLoad)
         },
         fromAllChannels,
       )
     } else {
-      // calls the load batch
+      // 执行这一批加载
       this.loaderPool.load(assetsToLoad)
     }
   }
 
-  /**
-   * The original called `this.mesh.geometry.updateAttributes()`, which does not
-   * exist on the LOD geometry, so calling it always threw. Nothing calls this
-   * method, it is kept as a documented no-op.
-   */
+  /** 空的占位实现，当前没有任何调用方。 */
   updateAttributes(): void {}
 
   reset(): void {

@@ -1,22 +1,20 @@
 /**
- * Generates the mock data the legacy engine loads, so the experiment can run
- * without the original (now unreachable) backend and asset bucket.
+ * 生成引擎加载的模拟数据，使实验无需原始（现已不可达的）后端和资源存储桶即可运行。
  *
- * Everything is produced from scratch with Node's zlib, no dependencies:
+ * 全部使用 Node 的 zlib 从零生成，无第三方依赖：
  *
- *   data/atlas<N>.jpg    texture atlas, `assetSize` tiles on a black background
- *   data/atlas<N>.bin    coords records read by `js/atlas/atlas.js`:
- *                        14 byte ascii id, 1 byte, ushort x*4, ushort y*4,
- *                        uchar w*4, uchar h*4  (little endian, 21 bytes each)
- *   data/rasterfairy.png one pixel per asset, RGB = index + 1
- *   data/colors.png      one pixel per asset, R = hue/360*255, G = brightness
- *   data/timeline.png    one pixel per asset, RGB = year + 8300000 (the engine's
- *                        date encoding); the pixel count must not exceed the
- *                        asset count, see `dimensionsFor`
- *   data/berekhat_ram.jpg the intro artwork image
- *   data/mock-items.json  item metadata for `Model.items`
+ *   data/atlas<N>.jpg    纹理图集，黑色背景上排布 `assetSize` 的图块
+ *   data/atlas<N>.bin    图集模块读取的坐标记录：
+ *                        14 字节 ascii id、1 字节、ushort x*4、ushort y*4、
+ *                        uchar w*4、uchar h*4（小端，每条 21 字节）
+ *   data/rasterfairy.png 每个资源一个像素，RGB = 索引 + 1
+ *   data/colors.png      每个资源一个像素，R = 色相/360*255，G = 亮度
+ *   data/timeline.png    每个资源一个像素，RGB = 年份 + 8300000（引擎的日期编码）；
+ *                        像素数不能超过资源数，见 `dimensionsFor`
+ *   data/berekhat_ram.jpg 片头美术图
+ *   data/mock-items.json  `Model.items` 的条目元数据
  *
- * Usage: node scripts/generate-mock-data.mjs [--atlases=2] [--assets=256] [--size=16]
+ * 用法：node scripts/generate-mock-data.mjs [--atlases=2] [--assets=256] [--size=16]
  */
 import { deflateSync } from 'node:zlib'
 import { mkdirSync, writeFileSync } from 'node:fs'
@@ -37,11 +35,11 @@ const ASSET_SIZE = argument('size', 16)
 const ATLAS_TILES = 128
 const ATLAS_SIZE = ASSET_SIZE * ATLAS_TILES
 const ID_LENGTH = 14
-// `Atlas.getOldestAsset()` looks this id up, so the first asset carries it.
+// `Atlas.getOldestAsset()` 会查找这个 id，因此第一个资源使用它
 const OLDEST_ID = 'PgFQ5eYVxWNuJA'
 const RASTERFAIRY_SIZE = 440
 
-// ---------------------------------------------------------------- png writer
+// ---------------------------------------------------------------- PNG 写入
 
 const crcTable = (() => {
   const table = new Uint32Array(256)
@@ -72,20 +70,20 @@ function chunk(type, data) {
   return Buffer.concat([length, typeAndData, crc])
 }
 
-/** Encodes 8 bit RGB pixels (Buffer of width*height*3) as a PNG. */
+/** 把 8 位 RGB 像素（宽度*高度*3 的 Buffer）编码为 PNG。 */
 function encodePng(width, height, rgb) {
   const raw = Buffer.alloc(height * (width * 3 + 1))
   for (let y = 0; y < height; y++) {
     const rowStart = y * (width * 3 + 1)
-    raw[rowStart] = 0 // filter: none
+    raw[rowStart] = 0 // 过滤器：none
     rgb.copy(raw, rowStart + 1, y * width * 3, (y + 1) * width * 3)
   }
 
   const ihdr = Buffer.alloc(13)
   ihdr.writeUInt32BE(width, 0)
   ihdr.writeUInt32BE(height, 4)
-  ihdr[8] = 8 // bit depth
-  ihdr[9] = 2 // colour type: truecolour
+  ihdr[8] = 8 // 位深
+  ihdr[9] = 2 // 颜色类型：真彩色
   ihdr[10] = 0
   ihdr[11] = 0
   ihdr[12] = 0
@@ -98,19 +96,18 @@ function encodePng(width, height, rgb) {
   ])
 }
 
-// -------------------------------------------------------------- mock content
+// -------------------------------------------------------------- 模拟内容
 
-/** Years spread over the whole "history of art" span, oldest artwork first. */
+/** 年份覆盖整段“艺术史”，最早的在前。 */
 function yearFor(index, total) {
   return -230000 + Math.round((index * 300000) / total)
 }
 
 /**
- * Largest divisor of `total` that stays a safe canvas width.
+ * 取 `total` 不超过安全画布宽度的最大因数。
  *
- * `getDates` walks the image row by row and maps pixel `i` to `atlas.assets[i]`,
- * dereferencing the asset even past the end of the asset list, so the date image
- * must not contain more pixels than there are assets.
+ * `getDates` 会逐行遍历图片并把第 `i` 个像素映射到 `atlas.assets[i]`，即使超出
+ * 资源数量也会解引用，因此日期图片的像素数不能多于资源数。
  */
 function dimensionsFor(total) {
   const maxWidth = 2048
@@ -128,8 +125,7 @@ function assetId(index) {
 }
 
 function colorFor(index) {
-  // deterministic, colourful, never black (black means "no data" for the
-  // engine's pixel encoded metadata)
+  // 确定性、鲜艳，且绝不能为黑（黑白像素在引擎的像素编码元数据中表示“无数据”）
   const hue = (index * 37) % 360
   const lightness = 0.45 + ((index * 13) % 25) / 100
   const c = (1 - Math.abs(2 * lightness - 1)) * 0.75
@@ -203,8 +199,8 @@ function writeColors(total) {
 
   for (let i = 0; i < total; i++) {
     const offset = i * 3
-    pixels[offset] = Math.round(((i * 37) % 360) / 360 * 255) // hue
-    pixels[offset + 1] = 80 + ((i * 13) % 175) // brightness
+    pixels[offset] = Math.round(((i * 37) % 360) / 360 * 255) // 色相
+    pixels[offset + 1] = 80 + ((i * 13) % 175) // 亮度
     pixels[offset + 2] = 0
   }
 
@@ -228,7 +224,7 @@ function writeIntroArtwork() {
     }
   }
 
-  // the engine loads this file with an `.jpg` name; browsers sniff the content
+  // 引擎以 `.jpg` 名称加载该文件，浏览器会按内容识别格式
   writeFileSync(resolve(projectRoot, 'data/berekhat_ram.jpg'), encodePng(size, size, pixels))
 }
 
@@ -237,7 +233,7 @@ function writeDates(total) {
   const pixels = Buffer.alloc(width * height * 3)
 
   for (let i = 0; i < total; i++) {
-    // the engine decodes `rgb - 8300000` back into a year
+    // 引擎通过 `rgb - 8300000` 还原年份
     const value = yearFor(i, total) + 8300000
     const offset = i * 3
     pixels[offset] = (value >> 16) & 0xff
@@ -272,7 +268,7 @@ function writeItems(total) {
   writeFileSync(resolve(projectRoot, 'data/mock-items.json'), JSON.stringify(items, null, 2))
 }
 
-// ------------------------------------------------------------------- generate
+// ------------------------------------------------------------------- 生成
 
 mkdirSync(resolve(projectRoot, 'data'), { recursive: true })
 

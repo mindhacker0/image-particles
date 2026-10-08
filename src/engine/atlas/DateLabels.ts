@@ -17,38 +17,17 @@ import { GrowingPacker, type PackerBlock, type PackerNode } from '../utils/Growi
 import { norm } from '../utils/math'
 
 /**
- *
- * Draws the timeline date labels. Every year is painted into one canvas that is
- * packed with `GrowingPacker`, uploaded as a single texture and rendered as a
- * strip of quads: all four vertices of a label share the same `position` (the x
- * of the label slot) while the quad corners live in the `offset` attribute, so
- * the vertex shader expands them in screen space. The material is published on
- * the atlas (`atlas.datesMaterial`) because `js/atlas/atlas.js` tweens its fog
- * uniforms.
- *
- * Notes on the non-obvious parts of the port:
- * - The module keeps module level state and a `ready` flag, so `init()` only
- *   ever runs once - the original relied on exactly the same flag (it declared
- *   `ready` twice, the second declaration being dead code).
- * - `interval` is declared although the original never used it either; it is
- *   kept so the module state matches the original.
- * - `BufferGeometry#addAttribute` (three < r125) is now `setAttribute`.
- * - The `type: "f" | "v3" | "t"` entries of the uniforms descriptor are a
- *   three < r125 leftover: modern three ignores the extra field and reads
- *   `value`, so the descriptor is cast instead of being rewritten.
- * - The label uniform is called `map` and not `texture`: three defines
- *   `texture2D` -> `texture` when it converts GLSL1 to GLSL3 on WebGL2, so a
- *   uniform named `texture` fails to compile.
- * - `renderer`, `camera` and `renderNeeded` are still owned by `js/main.js`
- *   (the render loop), `atlas.datesMaterial` by the not-yet-ported atlas.
+ * 时间线日期标签渲染器。
+ * 使用 canvas 生成文本贴图，再由 shader 以条带形式展示。
  */
 
-/** One entry of the `dates` array built by `js/apps/timeline/timescroll.js`. */
+/** 时间线数据块。 */
 export interface DateLabelBlock {
   year: string | number
   [key: string]: unknown
 }
 
+/** 日期标签字体设置。 */
 export interface DateLabelFont {
   color: string
   size: number
@@ -56,21 +35,21 @@ export interface DateLabelFont {
   type: string
 }
 
-/** The mesh carries the `show` / `hide` helpers the original attaches to it. */
+/** 绑定了 `show` / `hide` 方法的标签网格。 */
 type DateLabelsMesh = Mesh & {
   show(duration?: number): void
   hide(duration?: number): void
 }
 
 interface DateLabels {
-  /** `undefined` when called a second time: the original returned nothing then. */
+  /** 重复调用时返回 `undefined`（第二次调用不再创建）。 */
   init(dates: DateLabelBlock[], spacing: number, font?: DateLabelFont): DateLabelsMesh | undefined
   update(): void
   show(duration?: number): void
   hide(duration?: number): void
 }
 
-/** Text measurement of one label plus its packer node and its source block. */
+/** 纹理打包所需的标签矩形信息。 */
 interface LabelRect extends PackerBlock {
   w: number
   h: number
@@ -79,17 +58,17 @@ interface LabelRect extends PackerBlock {
   block: DateLabelBlock
 }
 
-// module private state
+// 模块私有状态
 let material: ShaderMaterial
 let canvas: HTMLCanvasElement
 let context: CanvasRenderingContext2D
-// declared (and never used) by the original as well: kept so the module state matches
+// 保留字段（未使用）
 let interval: number
 const materials: ShaderMaterial[] = []
 let mesh: DateLabelsMesh
 let ready = false
 
-/** the renderer created by `Main.initTHREE` */
+/** 主渲染器实例。 */
 function legacyRenderer(): WebGLRenderer {
   return renderer
 }
@@ -104,10 +83,11 @@ function powerTwoCeiling(val: number): number {
   return val * val
 }
 
+/** 时间线日期标签的单例模块。 */
 export const dateLabels: DateLabels = (function (exports: DateLabels) {
   /**
-   * @param dates array of all dates
-   * @param font which font to use
+   * @param dates 所有日期数据
+   * @param font 使用的字体设置
    * @constructor
    */
   exports.init = function (
@@ -115,29 +95,26 @@ export const dateLabels: DateLabels = (function (exports: DateLabels) {
     spacing: number,
     font?: DateLabelFont,
   ): DateLabelsMesh | undefined {
-    // spacing = spacing || 100;
-
     if (ready) return
     ready = true
 
-    //todo add color uniform
+    // TODO：补充颜色 uniform
     font = font || { color: '#FFF', size: 60, padding: 5, type: 'verdana' }
 
-    // get rects
+    // 计算每个日期文本的矩形
     const rects: LabelRect[] = []
     let rect: LabelRect
 
     for (let i = 0; i < dates.length; i++) {
       const block = dates[i]
-      // `measureText` returns { w, h }; the rect is completed with the source
-      // data right after (the original did the same on its `rect` variable)
+      // `measureText` 返回 { w, h }，随后再补上源数据
       rect = canvasUtils.measureText(String(block.year), font, font.padding) as unknown as LabelRect
       rect.year = block.year
       rect.block = block
       rects.push(rect)
     }
 
-    // setup the canvas
+    // 创建 canvas
     canvas = document.createElement('canvas')
     context = canvas.getContext('2d') as CanvasRenderingContext2D
 
@@ -146,10 +123,10 @@ export const dateLabels: DateLabels = (function (exports: DateLabels) {
     packer.root.w = canvas.width = powerTwoCeiling(packer.root.w)
     packer.root.h = canvas.height = powerTwoCeiling(packer.root.h)
 
-    // draw on the canvas
+    // 在 canvas 上绘制文本
     for (let j = 0; j < rects.length; j++) {
       rect = rects[j]
-      // `fit()` sets a node on every block it is given, the cast is only for TS
+      // `fit()` 会为每个块设置节点，这里的类型断言仅为满足 TS
       const fit = rect.fit as PackerNode
 
       context.save()
@@ -159,18 +136,17 @@ export const dateLabels: DateLabels = (function (exports: DateLabels) {
       context.font = font.size + 'px ' + font.type
 
       context.fillStyle = font.color
-      // fillText stringifies its argument, exactly like the original did
+      // fillText 会把参数转为字符串
       context.fillText(String(rect.year), font.padding, font.size - font.padding)
 
       context.restore()
     }
 
-    // document.body.appendChild( canvas );
     canvas.style.position = 'absolute'
     canvas.style.top = '0'
     canvas.style.left = '0'
 
-    // create the geometry
+    // 创建几何体
     const spriteCount = rects.length
 
     const vertices = new Float32Array(spriteCount * 4 * 3)
@@ -182,8 +158,6 @@ export const dateLabels: DateLabels = (function (exports: DateLabels) {
     const totalHeight = packer.root.h
 
     let k: number, v: number, x: number, y: number, z: number, w: number, h: number
-    // the original reused the loop counter of the rects loop above (an implicit
-    // global left over from `for (var i = ...)`), here it is declared locally
     for (let i = 0; i < spriteCount; i++) {
       rect = rects[i]
       const fit = rect.fit as PackerNode
@@ -240,17 +214,15 @@ export const dateLabels: DateLabels = (function (exports: DateLabels) {
     }
 
     const geometry = new BufferGeometry()
-    // `addAttribute` was renamed to `setAttribute` in three r125
     geometry.setAttribute('offset', new BufferAttribute(offsets, 2))
     geometry.setAttribute('uv', new BufferAttribute(uvs, 2))
     geometry.setAttribute('position', new BufferAttribute(vertices, 3))
     geometry.setIndex(new BufferAttribute(indices, 1))
 
-    // update the canvas to the gc < ..?
     const texture = new Texture(canvas)
     texture.needsUpdate = true
 
-    // create the material
+    // 创建材质
     const r = new Vector2()
     legacyRenderer().getSize(r)
     material = new ShaderMaterial({
@@ -260,7 +232,7 @@ export const dateLabels: DateLabels = (function (exports: DateLabels) {
         scale: { type: 'f', value: 1 },
         opacity: { type: 'f', value: 1 },
 
-        ///fog
+        ///雾
         fogColor: { type: 'v3', value: new Vector3() },
         fogDistance: { type: 'f', value: 100000 },
       } as unknown as ShaderMaterialParameters['uniforms'],
@@ -272,9 +244,8 @@ export const dateLabels: DateLabels = (function (exports: DateLabels) {
       depthTest: true,
     })
     materials.push(material)
-    // console.log( material )
 
-    // the `show` / `hide` helpers are attached to the mesh instance, as in the original
+    // 将 `show` / `hide` 辅助方法挂到网格实例上
     mesh = new Mesh(geometry, material) as unknown as DateLabelsMesh
     mesh.show = function (duration?: number) {
       mesh.visible = true
@@ -344,10 +315,10 @@ uniform float scale;
 void main() {
 	vUv = uv;
 	
-	//project position
+	// 投影位置
 	vec4 projection = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
 	
-	//offset the corners
+	// 偏移四角
     projection.x += scale * offset.x;
     projection.y += scale * offset.y * ratio;
     
@@ -358,22 +329,22 @@ void main() {
 uniform vec3 fogColor;
 uniform float fogDistance;
   
-// texture is reserved: three converts GLSL1 shaders to GLSL3 on WebGL2,
-// where texture2D maps onto the built-in texture() function.
+// 不能命名为 texture：three 在 WebGL2 上把 GLSL1 转成 GLSL3，
+// 其中 texture2D 映射到内置的 texture() 函数。
 uniform sampler2D map;
 uniform float opacity;
 varying vec2 vUv;
 void main(){
 
-    //texture
+    // 采样纹理
     vec4 color = texture2D( map, vUv );
     
-    //fog
+    // 雾
     float depth = gl_FragCoord.z / gl_FragCoord.w;
     float d = clamp( 0., 1., pow( depth * ( 1./fogDistance ), 2. ) );
     if( d >= 1. ) discard;
     
-    //blend
+    // 混入雾色
     gl_FragColor = vec4( mix( color.rgb, fogColor, d ), opacity );
     
 }`

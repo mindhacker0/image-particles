@@ -2,11 +2,10 @@ import { createLegacyWorker } from '../workers/createLegacyWorker'
 
 /**
  *
- * Loads JSON through a web worker. The worker script itself is untouched: it is
- * bootstrapped through {@link createLegacyWorker} so it has the `Twix` helper its
- * source expects.
+ * 通过 web worker 加载 JSON；worker 由 {@link createLegacyWorker} 创建。
  */
 
+/** 生成随机 uuid 字符串。 */
 export function getUUID(): string {
   function s4(): string {
     return Math.floor((1 + Math.random()) * 0x10000)
@@ -30,12 +29,14 @@ export class JSONLoader {
     this.worker.addEventListener('message', this.onWorkerMessageHandler, false)
   }
 
+  /** 请求加载 url，成功后回调 json。 */
   load(url: string, callback: JsonCallback): void {
     const uuid = getUUID()
     this.callbacks[uuid] = callback
     this.worker.postMessage({ uuid, url })
   }
 
+  /** worker 返回结果后的处理。 */
   onWorkerMessage(event: MessageEvent): void {
     const uuid = event.data.uuid as string
     const json = event.data.json as unknown

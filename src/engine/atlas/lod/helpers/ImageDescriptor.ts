@@ -1,7 +1,7 @@
 import type { LODAssetLike } from '../types'
 
 /**
- * Data holder containing the image data associated to an asset at a given LOD.
+ * 保存某个资产在某一 LOD 下的图像数据。
  */
 export class ImageDescriptor {
   asset: LODAssetLike | null

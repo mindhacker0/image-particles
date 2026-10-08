@@ -1,7 +1,6 @@
-/**
- * Ported from `js/utils/dom_utils.js` (query string and offset helpers).
- */
+/** DOM 辅助函数：查询字符串与偏移量。 */
 
+/** 读取查询字符串中某个参数的值。 */
 export function getQueryParams(param: string): string | undefined {
   const qs = document.location.search.split('+').join(' ')
   const params: Record<string, string> = {}
@@ -15,7 +14,7 @@ export function getQueryParams(param: string): string | undefined {
   return params[param]
 }
 
-/** Parsed query string, evaluated once like the original IIFE did. */
+/** 解析后的查询字符串，仅在模块加载时求值一次。 */
 export const QueryString: Record<string, string | string[]> = (() => {
   const queryString: Record<string, string | string[]> = {}
   const query = window.location.search.substring(1)
@@ -24,13 +23,13 @@ export const QueryString: Record<string, string | string[]> = (() => {
   for (let i = 0; i < vars.length; i++) {
     const pair = vars[i].split('=')
 
-    // If first entry with this name
+    // 该名称的第一个值
     if (typeof queryString[pair[0]] === 'undefined') {
       queryString[pair[0]] = decodeURIComponent(pair[1])
-      // If second entry with this name
+      // 该名称的第二个值：转为数组
     } else if (typeof queryString[pair[0]] === 'string') {
       queryString[pair[0]] = [queryString[pair[0]] as string, decodeURIComponent(pair[1])]
-      // If third or later entry with this name
+      // 该名称的第三个及以后的值
     } else {
       ;(queryString[pair[0]] as string[]).push(decodeURIComponent(pair[1]))
     }
@@ -39,6 +38,7 @@ export const QueryString: Record<string, string | string[]> = (() => {
   return queryString
 })()
 
+/** 计算元素相对页面左上角的偏移量。 */
 export function getOffset(el: HTMLElement): { top: number; left: number } {
   let _x = 0
   let _y = 0

@@ -1,16 +1,9 @@
 import { twixAjax, type TwixRequest } from './twixWorker'
 
 /**
- * Ported from `js/works/models.js` (the data worker).
+ * 数据 worker。
  *
- * It used to be a classic script bootstrapped inside a blob worker so that the
- * `Twix.ajax` helper existed in the worker scope; it is a real module worker
- * now (`new Worker(new URL('./modelsWorker.ts', import.meta.url))` through
- * `createLegacyWorker`) and imports the helper instead.
- *
- * The routes are the legacy backend routes (`/freefall/api/...`); the mock
- * deployment has no such backend, so the requests simply fail there — the same
- * behaviour the blob bootstrap had.
+ * 请求的后端路由为 `/freefall/api/...`；本地模拟环境没有该后端，请求会直接失败。
  */
 
 interface WorkerScope {
@@ -37,6 +30,7 @@ interface ModelsWorkerMessage {
 
 let lastXhrSearch: TwixRequest | null = null
 
+/** worker 入口：按消息类型拼出后端 url 并发起请求。 */
 worker.onmessage = function (event: MessageEvent) {
   const message = event.data as ModelsWorkerMessage
   const type = message.type
@@ -109,7 +103,7 @@ worker.onmessage = function (event: MessageEvent) {
         try {
           json = JSON.parse(json)
         } catch {
-          // console.warn( "error", type, "->", err, json );
+          // 解析失败时保持原始字符串
         }
       }
 

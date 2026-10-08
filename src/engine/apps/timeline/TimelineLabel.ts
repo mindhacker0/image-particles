@@ -10,89 +10,52 @@ import { DatesMaterial } from '../../atlas/DatesMaterial'
 import { legacyCamera } from '../../legacyScope'
 
 /**
+ * 时间线上的单个日期标签：把日期绘制到画布（宽 `size`、高 `size / 4`）、
+ * 作为纹理上传，贴到共享的 `1 x 1` 平面上并使用图集的 `DatesMaterial`。
+ * `updateQuaternion()` 复制相机朝向，使标签始终面向观察者（由 `Timescroll.update` 调用）。
  *
- * One date label of the timeline: the date is painted into a canvas
- * (`size` x `size / 4`), uploaded as a texture and displayed on a shared
- * `1 x 1` plane with the atlas `DatesMaterial`. `updateQuaternion()` copies the
- * camera orientation onto the label so it always faces the viewer (called by
- * `Timescroll.update`).
- *
- * Port notes:
- * - `Mesh` here is three's own `Mesh`, imported from `three` (the ported atlas
- *   tile class lives in `src/engine/atlas/Mesh.ts`).
- * - The legacy constructor called `this.createMap()` / `this.createMaterial()`
- *   *before* `THREE.Mesh.call(...)`. A class cannot touch `this` before
- *   `super()`, so the canvas is built by the module private helpers below (the
- *   very same code) and handed to `super()`; the member functions keep the
- *   original names and delegate to those helpers, which leaves the observable
- *   result identical.
- * - `console.log( til++ )` of the original is kept, `til` has no other purpose.
- * - `geometrySc` is a module level geometry shared by every label, exactly like
- *   the original global.
- * - `date` accepts a number as well as a string: the constructor is called with
- *   a raw year in `timescroll.js` and with a formatted string in the other
- *   branch, and `measureText` / `fillText` stringify it either way.
- * - `camera` still belongs to `js/main.js`; it is read through the shared
- *   accessor of `src/engine/legacyScope.ts` (only its quaternion is used).
+ * `date` 同时接受数字与字符串，`measureText` / `fillText` 都会将其转为字符串。
  */
 
-/** Shared plane geometry of every timeline label (legacy `geometrySc`). */
+/** 所有时间线标签共享的平面几何体。 */
 const geometrySc = new PlaneGeometry(1, 1)
 
-/** Running label counter, logged by the original constructor. */
+/** 递增的标签计数器，构造时打印。 */
 let til = 0
 
-/** `camera` (`js/main.js`): the legacy code only reads its `quaternion` here. */
+/** 仅读取相机的 `quaternion`。 */
 function labelCamera(): { quaternion: Quaternion } {
   return legacyCamera() as unknown as { quaternion: Quaternion }
 }
 
-/** Draws the date into the canvas, the legacy `drawTimelineLabelRect`. */
+/** 将日期绘制到画布。 */
 function drawTimelineLabelRect(cnvs: HTMLCanvasElement, date: string | number): void {
   const ctx = cnvs.getContext('2d') as CanvasRenderingContext2D
-  // fill canvas
-  // ctx.fillStyle = 'rgba(255,0,0,0.5)';
-  // ctx.rect(0, 0, cnvs.width, cnvs.height);
-  // ctx.fill();
-  // draw text
+  // 绘制文字
   const fontSize = 60
   ctx.font = fontSize + 'px Roboto'
   ctx.fillStyle = 'white'
   const bnds = ctx.measureText(String(date))
-  // bnds.height = 60;
-  // var x = (cnvs.width-bnds.width)*0.5;
   const y = cnvs.height
   ctx.fillText(String(date), 0, y - 5)
-  // draw outline
-  // ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-  // ctx.lineWidth = 3;
-  // var textWidth = ctx.measureText(date.title.toUpperCase()).width;
-  // ctx.rect(tX, yOffset, textWidth+paddingX*2, fontSize+paddingY*2);
-  // ctx.stroke();
 }
 
-/** Creates the label canvas, the legacy `createMap`. */
+/** 创建标签画布。 */
 function createMap(size: number, date: string | number): HTMLCanvasElement {
-  //console.log( "create date canvas" );
   const cnvs = document.createElement('canvas')
   cnvs.width = size
   cnvs.height = size / 4
-  // the original fetched the context here although it never used it
+  // 这里调用了 getContext 但未使用其返回值
   cnvs.getContext('2d')
   drawTimelineLabelRect(cnvs, date)
   return cnvs
 }
 
-/** Creates the label material, the legacy `createMaterial`. */
+/** 创建标签材质。 */
 function createMaterial(map: HTMLCanvasElement): ShaderMaterial {
-  //console.log( "create date texture" );
   const texture = new Texture(map)
   texture.needsUpdate = true
   return DatesMaterial.getMaterial(texture)
-  // return new THREE.MeshBasicMaterial({
-  //     map: texture,
-  //     transparent: true
-  // });
 }
 
 export class TimelineLabel extends Mesh {
@@ -103,7 +66,7 @@ export class TimelineLabel extends Mesh {
   constructor(date: string | number, position: Vector3, size?: number, reduceFactor?: number) {
     console.log(til++)
 
-    // built before `super()` with the same helpers the member functions below use
+    // 在 `super()` 前用下方成员函数所用的辅助函数构建
     const canvasSize = size || 512
     const canvas = createMap(canvasSize, date)
     super(geometrySc, createMaterial(canvas))
@@ -112,7 +75,6 @@ export class TimelineLabel extends Mesh {
     this.reduceFactor = reduceFactor || 6
     this.canvas = canvas
     this.scale.set(80, 20, 1)
-    //this.scale.set(this.canvas.width / this.reduceFactor, this.canvas.height / this.reduceFactor, 1);
     this.position.copy(position)
     this.position.x -= 15
   }
@@ -125,6 +87,7 @@ export class TimelineLabel extends Mesh {
     return createMap(this.size, date)
   }
 
+  /** 让标签朝向相机。 */
   updateQuaternion(): void {
     this.quaternion.copy(labelCamera().quaternion)
   }

@@ -1,8 +1,8 @@
 /**
- * Minimal shape of an atlas asset as the LOD helpers see it.
+ * LOD 辅助模块所看到的最小图集资产形态。
  *
- * The full `Asset` class lives in `../Asset.ts`; the pools only need these few
- * members, so they stay decoupled from it.
+ * 完整的 `Asset` 类位于 `../Asset.ts`；池只需用到这几个成员，
+ * 因此与它保持解耦。
  */
 export interface LODAssetLike {
   id: string

@@ -4,6 +4,9 @@ dist/
 dist-ssr/
 .vite/
 
+# TypeScript incremental build cache (tsc -b)
+*.tsbuildinfo
+
 # Local editor / OS files
 *.local
 .DS_Store

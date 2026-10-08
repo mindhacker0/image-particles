@@ -1,7 +1,8 @@
 import type { FormulaAsset } from '../legacyScope'
 
-/** Ported from `js/atlas/formulas/wave_formula.js` (golden angle spiral). */
+/** 螺旋布局公式：把资产沿黄金角螺旋铺在平面上，波动效果在着色器中完成。 */
 export class WaveFormula {
+  // 参数保留以兼容调用方
   constructor(_amp?: unknown) {}
 
   apply(assets: FormulaAsset[]): void {

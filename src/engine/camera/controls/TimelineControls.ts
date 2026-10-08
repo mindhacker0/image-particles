@@ -8,44 +8,21 @@ import { type LegacyWheelEvent } from '../../utils/functions'
 import { norm } from '../../utils/math'
 
 /**
- * Ported from `js/camera/controls/timelineControls.js`.
- *
- * Camera controls of the timeline chapters: the flat (2D) and the perspective
- * (3D) timeline, the curator selection modes and the URL / year entry point.
- *
- * The original was an IIFE returning its own `exports` object; the port keeps
- * every member, argument order and default value and is meant to be published
- * as the `timelineControls` global driven by `js/camera/cameraControls.js` and
- *
- * Port notes:
- * - `lerp` / `norm` / `map` used to be globals of the not-yet-ported
- *   `js/camera/cameraControls.js`; `norm` is imported from `utils/math.ts`
- *   (same body).
- * - `dateLabels` is imported from the ported `atlas/DateLabels.ts` instead of
- *   reading the global of the same name.
- * - `atlas`, `camera`, `params` and `mouseWheelDeltaFactor` are still owned by
- *   classic scripts and are read at call time through the helpers below.
- * - `mouseHandler` re-reads `cameraControls.tweening` into a local variable
- *   right after returning on the very same condition, so that variable is
- *   always `false`: dead code kept as-is (it has no effect on behaviour).
- * - three's `OrbitControls` (r150+) replaced the `mouseButtons` keys
- *   `ORBIT` / `ZOOM` / `PAN` with `LEFT` / `MIDDLE` / `RIGHT`, so the
- *   assignments below no longer change the button mapping (same issue in
- *   `js/camera/cameraControls.js`): kept 1:1.
+ * 时间线相机控制器。
+ * 负责平面（2D）与透视（3D）时间线、curator 选择模式，以及 URL / 年份入口。
  */
 
 /* ------------------------------------------------------------------------- *
- * Legacy globals still owned by the classic scripts.
- * They are read at call time: they do not exist yet while this module is
- * evaluated / imported.
+ * 主模块共享状态。
+ * 它们在模块初始化时尚未就绪，只能在调用时惰性读取。
  * ------------------------------------------------------------------------- */
 
-/** `mouseWheelDeltaFactor`, reassigned by `cameraControls.setState`. */
+/** 滚轮系数，由 `cameraControls.setState` 重新赋值。 */
 function mouseWheelDeltaFactor(): number {
   return shared.mouseWheelDeltaFactor
 }
 
-/** One entry of `cameraControls.boundingBoxes` (built by the timeline app). */
+/** `cameraControls.boundingBoxes` 中的一项（由 timeline 应用构建）。 */
 interface TimelineBoundingBox {
   x: number
   y: number
@@ -54,8 +31,8 @@ interface TimelineBoundingBox {
 }
 
 /**
- * three's `OrbitControls` with the legacy `mouseButtons` key names (see the
- * port note in the header).
+ * 使用旧版 `mouseButtons` 键名的 three `OrbitControls` 接口；
+ * `{ ORBIT, ZOOM, PAN }` 在当前 three 版本已不再生效。
  */
 interface LegacyOrbitControls {
   enabled: boolean
@@ -68,7 +45,7 @@ interface LegacyOrbitControls {
   update(): boolean
 }
 
-/** `cameraControls` (`js/camera/cameraControls.js`) as this module uses it. */
+/** 本模块使用的 cameraControls 接口。 */
 interface TimelineControlsContext {
   tweening: boolean
   orbitControls: LegacyOrbitControls
@@ -92,10 +69,7 @@ function cameraControls(): TimelineControlsContext {
   return engineCameraControls as unknown as TimelineControlsContext
 }
 
-/**
- * `setFogDistance` / `skipAnimation` are not part of the `atlasInstance()` view
- * (`js/atlas/atlas.js`).
- */
+/** `atlasInstance()` 视图未包含的 `setFogDistance` / `skipAnimation`。 */
 interface TimelineAtlas {
   setFogDistance(value: number, duration?: number): void
   skipAnimation(): void
@@ -105,23 +79,22 @@ function atlasApi(): TimelineAtlas {
   return atlasInstance() as unknown as TimelineAtlas
 }
 
-/** The timeline scrollbar built by `js/apps/timeline/timescroll.js`. */
+/** 时间线滚动条接口。 */
 interface Timescroll {
-  /** Bounds of the given year's block (the original reads `x` / `y`). */
+  /** 返回指定年份区块的边界。 */
   getBoundingBoxByYear(year: number): { x: number; y: number }
 }
 
 /**
- * Events handed to `mouseHandler`: the raw wheel event (the legacy `wheelDelta`
- * / `deltaY` branches are inlined here, `normalizeWheel` is commented out in
- * the original) or a Hammer event with a `center`.
+ * 传给 `mouseHandler` 的事件：原始滚轮事件（直接读取 `wheelDelta` / `deltaY`），
+ * 或带 `center` 的 Hammer 事件。
  */
 type TimelineControlEvent = LegacyWheelEvent & {
   type: string
   center: { x: number; y: number }
 }
 
-/** The `timelineControls` global consumed by `js/camera/cameraControls.js`. */
+/** 对外暴露的 timelineControls 对象。 */
 interface TimelineControls {
   axisDistance: number
   axis: THREE.Vector3
@@ -156,11 +129,13 @@ export const timelineControls: TimelineControls = (function (exports: TimelineCo
   const axis3D = new THREE.Vector3(-1.5, 0, 0.75)
   exports.axis = axis2D
 
+  /** 初始化：缓存共享的 orbitControls / target。 */
   exports.init = function () {
     orbitControls = cameraControls().orbitControls
     target = cameraControls().target
   }
 
+  /** 切换到目标状态：设置轴与距离，并将相机补间到相应位置。 */
   exports.setState = function (newState: number) {
     cameraControls().trackball.enabled = false
     orbitControls.enabled = true
@@ -179,14 +154,12 @@ export const timelineControls: TimelineControls = (function (exports: TimelineCo
     state = newState
     switch (newState) {
       case cameraControls().TIMELINE_3D:
-        // gsap.to( exports.axis, 1, { x:axis3D.x, y:axis3D.y, z:axis3D.z } );
         exports.axis = axis3D
 
         exports.axisDistance = Math.min(
           2500,
           legacyCamera().position.distanceTo(target.position),
         )
-        // gsap.to( exports, 1, { axisDistance : Math.min( 2500, camera.position.distanceTo( target.position ) ) } );
 
         dest = target.position
           .clone()
@@ -204,7 +177,6 @@ export const timelineControls: TimelineControls = (function (exports: TimelineCo
       case cameraControls().TIMELINE_FLAT:
         orbitControls.enableZoom = true
 
-        // gsap.to( exports.axis, 1, { x:axis2D.x, y:axis2D.y, z:axis2D.z } );
         exports.axis = axis2D
 
         cameraControls().cameraGoto(
@@ -227,7 +199,6 @@ export const timelineControls: TimelineControls = (function (exports: TimelineCo
           motionDuration,
         )
 
-        // atlas.setFogDistance( 50000, 2 );
         gsap.to(orbitControls, { duration: motionDuration, maxDistance: 10000 })
 
         break
@@ -237,11 +208,12 @@ export const timelineControls: TimelineControls = (function (exports: TimelineCo
     ready = true
   }
 
+  /** 将相机定位于指定年份（或 URL 指定位置）并播放入场动画。 */
   exports.setFirstLocation = function (timescroll: Timescroll, year?: number) {
     let duration = 3
     gsap.to(exports, { duration, axisDistance: 2500 })
 
-    //starts at provided year
+    // 从指定年份开始
     const bounds = timescroll.getBoundingBoxByYear(year || 0)
     const center = new THREE.Vector3(bounds.x, bounds.y + 300, 0)
     const tarDest = new THREE.Vector3(center.x, center.y, 0)
@@ -252,7 +224,6 @@ export const timelineControls: TimelineControls = (function (exports: TimelineCo
 
     const params = legacyParams()
     if (params.initHash && params.initHash !== '') {
-      // console.log( "from URL >", params.initHash );
       atlasApi().skipAnimation()
       cameraControls().initFromUrl(params.initHash, 0)
 
@@ -269,12 +240,11 @@ export const timelineControls: TimelineControls = (function (exports: TimelineCo
       params.initHash = ''
     }
 
-    //go to
-    //cameraControls.onShift(camDest, duration );
     cameraControls().cameraGoto(camDest, duration)
     cameraControls().targetGoto(tarDest, duration)
   }
 
+  /** 随 Shift 键在 3D 与平面时间线之间切换。 */
   exports.onShift = function (newState: boolean) {
     shiftDown = newState
 
@@ -289,15 +259,16 @@ export const timelineControls: TimelineControls = (function (exports: TimelineCo
     }
   }
 
+  /** 处理滚轮缩放与拖拽平移。 */
   exports.mouseHandler = function (event: TimelineControlEvent) {
     if (cameraControls().tweening) return
+    // 此处 tweening 恒为 false（上方已对同一条件提前返回）。
     const tweening = cameraControls().tweening
 
     switch (event.type) {
       case 'wheel':
       case 'mousewheel':
         if (!tweening) {
-          //var delta = -normalizeWheel(e).spinY * 10;
           let delta = event.wheelDelta !== undefined ? -event.wheelDelta : event.deltaY * 14
           delta = delta * mouseWheelDeltaFactor()
           exports.axisDistance += delta * 0.25
@@ -335,12 +306,11 @@ export const timelineControls: TimelineControls = (function (exports: TimelineCo
   }
 
   const it = 0
+  /** 每帧约束相机与目标的 X / Y / Z 范围。 */
   exports.update = function (tweening?: boolean): boolean | void {
-    // exports.axisDistance = camera.position.distanceTo(target.position);
-    // console.log( exports.axisDistance );
     if (!ready) return false
     if (cameraControls().tweening) return
-    //picks the highest point to compute the upper bound
+    // 取最高点计算上边界
     getTimelineBoundingBox()
 
     let p: THREE.Vector3 | undefined
@@ -355,7 +325,7 @@ export const timelineControls: TimelineControls = (function (exports: TimelineCo
         )
     deltaPoint.multiplyScalar(0.9)
 
-    //X axis: keeps the camera in front of the timeline's bounds
+    // X 轴：让相机保持在时间线边界前方
     let maxX: number
     if (cameraControls().boundingBoxes == null) {
       maxX = 100000
@@ -369,7 +339,7 @@ export const timelineControls: TimelineControls = (function (exports: TimelineCo
       lowerBound = 0
     }
 
-    //Y axis: maintian the camera & target between 0 and the highest bound
+    // Y 轴：把相机与目标限制在 0 与最高边界之间
     if (box) {
       target.position.y = Math.max(lowerBound, target.position.y)
       target.position.y = Math.min(upperBound, target.position.y)
@@ -385,9 +355,7 @@ export const timelineControls: TimelineControls = (function (exports: TimelineCo
       camera.position.y = target.position.y
     }
 
-    // console.log( lowerBound, upperBound );
-
-    //Z axis: lock to 0
+    // Z 轴：锁定为 0
     target.position.z = 0
 
     if (state == cameraControls().TIMELINE_3D || state == cameraControls().TIMELINE_FLAT) {
@@ -397,27 +365,16 @@ export const timelineControls: TimelineControls = (function (exports: TimelineCo
         .clone()
         .add(exports.axis.normalize().multiplyScalar(exports.axisDistance))
       camera.position.copy(p)
-
-      // }
-      // else
-      // {
-      //     camera.position.x += ( target.position.x - camera.position.x ) * .1;
-      //     camera.position.y += ( target.position.y - camera.position.y ) * .1;
     }
     return orbitControls.update()
   }
 
+  /** 约束钩子（当前为空实现）。 */
   exports.constrain = function () {
-    // if( state == cameraControls.TIMELINE_FLAT ){
-    //
-    //     // console.log("yo", target.position.x - camera.position.x, target.position.y - camera.position.y );
-    //     camera.position.x = target.position.x;
-    //     camera.position.y = target.position.y;
-    // }
   }
 
+  /** 根据当前 box 及其相邻 box 计算上下边界。 */
   function getTimelineBoundingBox() {
-    // console.log( "getTimelineBoundingBox", cameraControls.boundingBoxes, cameraControls.timelineWidth )
     if (cameraControls().boundingBoxes == null || cameraControls().boundingBoxes.length == 0) {
       upperBound = 100000
       lowerBound = -100000
@@ -426,11 +383,10 @@ export const timelineControls: TimelineControls = (function (exports: TimelineCo
     if (cameraControls().boundingBoxes.length == 1) {
       box = cameraControls().boundingBoxes[0]
       upperBound = box.height
-      // console.log(box)
       return box
     }
 
-    //if the box contains the target
+    // 若该 box 包含目标
     const x = target.position.x
     let boxId: number
     cameraControls().boundingBoxes.forEach(function (b, i, a) {
@@ -442,7 +398,7 @@ export const timelineControls: TimelineControls = (function (exports: TimelineCo
 
     if (isNaN(boxId)) return
 
-    //computes the upper limit to block camera based on the current box' neighbours
+    // 结合相邻 box 计算用于限制相机的上边界
     upperBound = box.height
 
     const off = 15
@@ -455,6 +411,7 @@ export const timelineControls: TimelineControls = (function (exports: TimelineCo
     upperBound += 10
   }
 
+  /** 记录选中的素材，并调整轴距。 */
   exports.selectAsset = function (asset: unknown) {
     selectedAsset = asset
     if (asset) gsap.to(exports, { duration: 1, axisDistance: orbitControls.minDistance })

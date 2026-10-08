@@ -3,12 +3,8 @@ import type { ImageDescriptor } from './helpers/ImageDescriptor'
 import type { LODDescriptor } from './helpers/LODDescriptor'
 
 /**
- *
- * Canvas backed texture for one level of detail: each tile holds the artwork
- * image of an asset, and the canvas is redrawn when the pool changes.
- *
- * The three API used here (`Texture`, `LinearFilter`) is unchanged in modern
- * revisions; the canvas only has to be flagged with `needsUpdate`.
+ * 某一细节层级的 Canvas 纹理：每个图块存放一个资产的图像，
+ * 池内容变化时重绘画布。
  */
 
 const TILE_COLORS = ['#f00', '#FC0', '#0C3', '#03C']
@@ -56,6 +52,7 @@ export class LODTexture {
   }
 
   rebuildTexture(imageDescriptors: ImageDescriptor[]): void {
+    // 按行优先顺序把每个图块的图像绘制到画布上
     const scope = this
     const tileSize = this.desc.tileSize
     const rowCount = this.desc.rowCount

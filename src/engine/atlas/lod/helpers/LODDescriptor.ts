@@ -1,5 +1,5 @@
 /**
- * Stores the information about one level of detail.
+ * 保存某一细节层级的配置信息。
  */
 export class LODDescriptor {
   lod: number
@@ -15,12 +15,12 @@ export class LODDescriptor {
     this.textureSize = textureSize
     this.range = range
 
-    // stores the capacity of this LOD
+    // 记录该 LOD 的容量
     this.rowCount = parseInt(String(this.textureSize / this.tileSize), 10)
     this.tileCount = parseInt(String(Math.pow(this.rowCount, 2)), 10)
   }
 
-  /** Returns the maximum number of tiles available on this LOD. */
+  /** 返回该 LOD 可用的最大图块数。 */
   getTileCount(): number {
     return parseInt(String(Math.pow(this.textureSize / this.tileSize, 2)), 10)
   }

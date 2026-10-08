@@ -2,21 +2,11 @@ import JsonLoaderWorker from './jsonLoaderWorker?worker'
 import ModelsWorker from './modelsWorker?worker'
 
 /**
- * Creates the data worker for a legacy worker script path.
+ * 根据旧 worker 脚本路径创建数据 worker。
  *
- * The legacy worker scripts (`js/works/models.js`, `js/works/json_loader.js`)
- * called `Twix.ajax` from inside the worker, where the page globals are not
- * reachable, and the original build relied on a `twix.min.js` vendor file that
- * does not exist in this repository. They used to be bootstrapped through a blob
- * worker that installed an XMLHttpRequest based `Twix` and then `importScripts`
- * the real script — including a workaround for the fact that a blob worker
- * cannot resolve relative URLs.
- *
- * Both workers are TypeScript modules now (`modelsWorker.ts`,
- * `jsonLoaderWorker.ts`) importing that helper directly, so Vite bundles them as
- * real workers in development and in the build. The legacy script path is still
- * the argument because `JSONLoader` and `data/Models.ts` pass the path they were
- * written with.
+ * 参数沿用旧脚本路径（`works/models.js`、`works/json_loader.js`），因为
+ * `JSONLoader` 和 `data/Models.ts` 是按该路径调用的；这里把路径映射到 Vite
+ * 打包的模块 worker（`modelsWorker.ts`、`jsonLoaderWorker.ts`）。
  */
 export function createLegacyWorker(relativePathBelowJs: string): Worker {
   switch (relativePathBelowJs) {
@@ -31,7 +21,7 @@ export function createLegacyWorker(relativePathBelowJs: string): Worker {
   }
 }
 
-/** Publishes {@link createLegacyWorker} for the modules that expect it as a global. */
+/** 汇聚 {@link createLegacyWorker} 的导出对象。 */
 export const legacyWorkerGlobals = {
   createLegacyWorker,
 }

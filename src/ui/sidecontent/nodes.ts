@@ -1,17 +1,13 @@
 /**
- *
- * Registry of the DOM nodes the side content components render, the same idea as
- * `src/ui/uiNodes.ts`: the legacy class exposed the dialog nodes and bound its
- * listeners to them. React owns that markup now, so the components publish their
- * remaining nodes here and `SideContentFacade.ts` reads them back.
+ * 侧边内容组件渲染的 DOM 节点注册表，思路同 `src/ui/uiNodes.ts`：
+ * 组件登记节点，`SideContentFacade.ts` 读取它们。
  */
 
 export interface SideContentNodes {
-  /** `.mdl-dialog-back` */
+  /** `.mdl-dialog-back` 遮罩。 */
   back: HTMLElement | null
-  /** `dialog.help` */
+  /** `dialog.help` 帮助对话框。 */
   helpDialog: HTMLDialogElement | null
-  /** `dialog.app a` (the app store links) */
 }
 
 export const sideContentNodes: SideContentNodes = {

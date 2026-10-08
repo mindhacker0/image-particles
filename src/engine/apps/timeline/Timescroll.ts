@@ -6,44 +6,21 @@ import { legacyScene } from '../../legacyScope'
 import type { TimelineLabel } from './TimelineLabel'
 
 /**
- *
- * The timeline chapter of the freefall app: it buckets the atlas assets per
- * decade (`setup`), lays every decade out as a column of blocks of three items
- * (`layout`) and draws one row of date labels with `dateLabels`. The constructor
- * creates the `Object3D` container that holds those labels and adds it to the
- * scene.
- *
- * Port notes:
- * - the legacy file is a constructor function with prototype methods, not an
- *   IIFE: it is written as a class expression so that the requested
- *   `export const Timescroll` holds the same members with the same call sites
- *   (`new Timescroll(atlas.assets)`, `setup()`, `layout()`, `getWidth()`, ...)
- * - `scene` still belongs to `js/main.js` and is read through
- *   `src/engine/legacyScope.ts`; `Model.items` and `dateLabels` are imported from
- *   their already ported modules
- * - `this.years.sort(function(a, b) { return a - b })` compared object keys as
- *   numbers, which needs an explicit conversion now that the keys are typed as
- *   strings: `Number(a) - Number(b)` is the same coercion
- * - `this.labels` only ever receives `TimelineLabel` instances: the only
- *   `push` lives in the commented out body of `burstYear`, which is kept
- *   verbatim
- * - `remove()` nulls the container exactly like the original did, even though
- *   `clear()` would fail on it afterwards
- * - `timelineHeight` is only assigned by the commented out part of `layout()`,
- *   hence `undefined` at runtime, as in the original (read by
- *   `js/apps/app_freefall.js`)
+ * 时间线章节：按年代（十年）为资源分桶（`setup`），
+ * 把每个年代排布成每行三个条目的列（`layout`），
+ * 并用 `dateLabels` 绘制一行日期标签。
+ * 构造函数创建承载标签的 `Object3D` 容器并加入场景。
  */
 
-/** One decade bucket built by `setup()`. */
+/** `setup()` 构建的单个年代桶。 */
 interface YearData {
   year: number
   items: Asset[]
 }
 
 /**
- * One entry of `bboxes`; `js/camera/controls/timelineControls.js` reads `x` / `y`.
- * Declared as a type alias (not an interface) so that it stays assignable to
- * `DateLabelBlock` of `atlas/DateLabels.ts`, which carries an index signature.
+ * `bboxes` 的一项，其 `x` / `y` 被时间线相机控制读取。
+ * 使用类型别名（而非接口），以保持可赋值给带索引签名的 `DateLabelBlock`。
  */
 export type TimescrollBBox = {
   year: string | number
@@ -53,7 +30,7 @@ export type TimescrollBBox = {
   height: number
 }
 
-/** The labels strip `dateLabels.init` returns. */
+/** `dateLabels.init` 返回的标签网格。 */
 type TimelineLabelsMesh = ReturnType<typeof dateLabels.init>
 
 export const Timescroll = class Timescroll {
@@ -67,11 +44,11 @@ export const Timescroll = class Timescroll {
   initialized = false
   margin = new Vector3(25, 35, 25 * 3 + 30)
 
-  /** filled by `setup()` */
+  /** 由 `setup()` 填充。 */
   years: string[] = []
   assetsPerYears: Record<string, YearData> = {}
 
-  /** only assigned by the commented out part of `layout()`, as in the original */
+  /** 仅由 `layout()` 中被注释掉的部分赋值，运行时为 undefined。 */
   timelineHeight: number
 
   container: Object3D
@@ -82,8 +59,9 @@ export const Timescroll = class Timescroll {
     legacyScene().add(this.container)
   }
 
+  /** 按十年为单位分桶资源，并把无日期的资源交给回调返回。 */
   setup(readyCb?: (itemsWithoutDate: string[]) => void): void {
-    // index items per decade
+    // 按年代为条目分桶
     const itemsWithoutDate: string[] = []
     this.assetsPerYears = {}
     let asset: Asset
@@ -107,7 +85,7 @@ export const Timescroll = class Timescroll {
 
     this.years = Object.keys(this.assetsPerYears)
     this.years.sort(function (a, b) {
-      // the original relied on the implicit string -> number coercion here
+      // 键为字符串，需显式转换为数字后比较
       return Number(a) - Number(b)
     })
     this.numYears = this.years.length
@@ -126,10 +104,8 @@ export const Timescroll = class Timescroll {
   remove(): void {
     this.clear()
     this.labels = []
-    //this.el.style.display = 'none';
     legacyScene().remove(this.container)
-    // the original nulled the container here (only ever reused after a new
-    // instance is built): the null is kept so the member state matches
+    // 容器置空：仅在新建实例后才会重新使用
     this.container = null as unknown as Object3D
   }
 
@@ -157,63 +133,14 @@ export const Timescroll = class Timescroll {
     }
   }
 
+  /** 布局每个年代：每行三个条目，并生成日期标签。 */
   layout(): void {
-    /*
-    var marginX = this.margin.x;
-    var marginY = this.margin.y;
-    var marginZ = this.margin.z;
-    this.timelineHeight = 0;
-    var labels = [];
-    var z = marginZ;
-    for (var i = 0; i < this.years.length; i++) {
+    const size = 20 // 条目尺寸
+    const space = 10 // 条目间距
+    const block = size + space // 条目 + 间距
+    const margin = 40 // 每三个条目组成一块，此为块间距
 
-        var year = this.assetsPerYears[ this.years[i] ];
-        var yearLabel = year.year;
-        var yearItems = year.items;
-        var asset;
-        var offX = 0;
-        var offY = 8;
-        var lineMaxH = 0;
-        for (var k = 0, len = yearItems.length; k < len; k++) {
-
-            asset = yearItems[k];
-            lineMaxH = asset.sizeNorm.h > lineMaxH ? asset.sizeNorm.h : lineMaxH;
-            offX = z + (k % 3) * marginX;
-            asset.setPosition(
-                offX ,
-                offY,
-                0 );
-            if (k % 3 == 2) {
-                offY += lineMaxH + 8;
-                lineMaxH = 0;
-            }
-        }
-
-        offY += lineMaxH + 8;
-        this.timelineHeight = Math.max( offY, this.timelineHeight);
-
-
-        var bbox = {
-            year : yearLabel,
-            count:yearItems.length,
-            offY : offY,
-            margin: 3 * marginX + marginZ,
-            box:new THREE.Vector4( z + 1.5 * marginX, offY/2, 3 * marginX, offY ) };
-
-        this.bboxes.push( bbox );
-
-        labels.push( { year : year.year } );
-
-        z += marginZ;
-    }
-    //*/
-
-    const size = 20 //item size
-    const space = 10 //space between items
-    const block = size + space //combo size + space
-    const margin = 40 //margin between blocks of 3 items
-
-    //total size of a block of 3 items + margin
+    // 三个条目组成的块总宽度（含块间距）
     const blockWidth = 3 * size + 2 * space + margin
 
     this.margin.z = blockWidth
@@ -227,7 +154,6 @@ export const Timescroll = class Timescroll {
           ? yearData.year.toString().replace('-', '') + ' BC'
           : yearData.year
 
-      // console.log( yearData.year, prettyFormat );
       const box: TimescrollBBox = {
         year: prettyFormat,
         x: i * blockWidth,
@@ -248,11 +174,11 @@ export const Timescroll = class Timescroll {
 
     if (this.initialized) return
     this.initialized = true
-    //creates the labels
+    // 创建标签
     this.createLabels(this.bboxes, blockWidth, { color: '#FFF', size: 64, padding: 1, type: 'roboto' })
   }
 
-  //creates the dates labels for this timeline
+  /** 为时间线创建日期标签。 */
   createLabels(dates: TimescrollBBox[], spacing: number, font?: DateLabelFont): TimelineLabelsMesh {
     const mesh = dateLabels.init(dates, spacing, font)
     this.container.add(mesh)
@@ -263,8 +189,7 @@ export const Timescroll = class Timescroll {
   getBoundingBoxByYear(year: string | number): TimescrollBBox {
     let selected: TimescrollBBox | undefined = undefined
     this.bboxes.forEach(function (b) {
-      // loose comparison kept from the original: `year` is a number for most
-      // entries but the negative ones are formatted as '... BC' strings
+      // 保持宽松比较：多数条目 `year` 为数字，负数条目格式化为 '... BC' 字符串
       if (b.year == year) {
         selected = b
       }
@@ -274,36 +199,5 @@ export const Timescroll = class Timescroll {
 
   burstYear(yearId: number): number {
     return this.getWidth()
-    /*
-    var year = this.assetsPerYears[this.years[yearId]];
-
-    var yearLabel = year.year;
-    var yearItems = year.items;
-    var asset;
-
-    var pos = new Vector3((yearId + 1) * this.margin.z, -25, -5);
-
-    var label;
-    if (year.year < -9999) {
-        label = new TimelineLabel(yearLabel, pos, 256, 3);
-        label.position.x += 30;
-    } else {
-        label = new TimelineLabel(yearLabel + (yearLabel > 1900 ? 's' : ''), pos, 256, 2.1);
-        label.position.x += 52;
-    }
-    this.container.add(label);
-    this.labels.push(label);
-    this.destYear = yearLabel;
-    if (isNaN(this.currYear)) {
-        this.currYear = this.destYear;
-    }
-
-    if (yearId == this.years.length - 1) {
-        this.currYear = this.destYear = 2016;
-    }
-
-    // return label.position.x + this.margin.z;
-    return (yearId + 1) * this.margin.z + this.margin.z;
-    */
   }
 }

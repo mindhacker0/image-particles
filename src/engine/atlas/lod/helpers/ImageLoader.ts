@@ -2,11 +2,8 @@ import type { LODDescriptor } from './LODDescriptor'
 import type { LODAssetLike } from '../types'
 
 /**
- * (the original module was a self-invoking factory returning an inner `Loader`
- * class, exported under the `ImageLoader` name).
- *
- * Loads the artwork image of an asset through XHR, then decodes it as an
- * `Image` so the result can be drawn into the LOD texture.
+ * 通过 XHR 加载资产的图像，再解码为 `Image`，
+ * 以便绘制到 LOD 纹理中。
  */
 export type ImageLoaderCallback = (loader: ImageLoader) => void
 
@@ -17,7 +14,7 @@ export class ImageLoader {
   url: string | null = null
   asset: LODAssetLike | null = null
 
-  // set when the image finished decoding
+  // 图像解码完成后设置
   img: HTMLImageElement | null = null
   width = 0
   height = 0
@@ -51,7 +48,7 @@ export class ImageLoader {
 
     this.url = asset.image_url
 
-    // the original backend served resized images through a `=s<size>` suffix
+    // 通过 `=s<size>` 后缀请求指定尺寸的图片
     let validUrl = (this.url as string).replace('http:', 'https:')
     validUrl += '=s' + lodDescriptor.tileSize
 

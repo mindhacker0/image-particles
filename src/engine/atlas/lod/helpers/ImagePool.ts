@@ -2,7 +2,7 @@ import type { ImageDescriptor } from './ImageDescriptor'
 import type { LODAssetLike } from '../types'
 
 /**
- * Cache holding the `ImageDescriptor`s of a LOD.
+ * 缓存某一 LOD 的 `ImageDescriptor`。
  */
 export class ImagePool {
   limit: number
@@ -13,6 +13,7 @@ export class ImagePool {
     this.limit = limit || 16
   }
 
+  /** 存入缓存并记录其资产。 */
   add(imgDescriptor: ImageDescriptor): void {
     if (imgDescriptor.id == null) {
       return
@@ -22,13 +23,14 @@ export class ImagePool {
     this.assets.push(imgDescriptor.asset as LODAssetLike)
   }
 
+  /** 按 id 取回缓存项，缺失时返回 null。 */
   get(id: string): ImageDescriptor | null {
     if (this.hash[id]) return this.hash[id]
     return null
   }
 
+  /** 超出上限时清理尚未绘制的缓存项。 */
   clean(_lod?: number): void {
-    // clears the cache if too big
     if (this.assets.length > this.limit) {
       let deletion = 0
       const tmp: LODAssetLike[] = []

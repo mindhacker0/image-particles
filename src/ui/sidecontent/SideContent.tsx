@@ -2,34 +2,28 @@ import { sideContentNodes } from './nodes'
 import { closeSideContentDialog, useSideContentState, type SideContentState } from './state'
 
 /**
+ * 侧边内容：`.mdl-dialog-back` 遮罩与 `dialog.mdl-dialog` 弹窗。
  *
- * The side content of the page: the item detail panel of the original experiment
- * is not part of `js/ui/sidect.js` in this snapshot (see `state.ts`), so this
- * module is the markup the class drove - the `.mdl-dialog-back` backdrop and the
- * `dialog.mdl-dialog` popin - moved out of `index.html` verbatim (every
- * class name is kept, so `css/main.css` still applies).
- *
- * The legacy class opened the dialogs with `setAttribute('open', '')` and added
- * `.show` to the backdrop. Those are `SideContentState` fields now, written by
- * `SideContentFacade.ts`.
+ * 对话框开关由 `SideContentState` 字段表示，由 `SideContentFacade.ts` 写入。
  */
 
-/** React renders `open={false}` as `open="false"`, which matches `dialog[open]`. */
+/**
+ * 用 `undefined` 移除 `open` 属性（`open={false}` 仍会渲染出 `open="false"`，
+ * 使 `dialog[open]` 命中）。
+ */
 function dialogOpenAttribute(opened: boolean): true | undefined {
   return opened ? true : undefined
 }
 
 /**
- * `Sidect.openCurrentDialog` / `closeCurrentDialog` drive the components through
- * this hook; the components never mutate the DOM themselves.
+ * 对话框由门面通过本 Hook 驱动；组件自身不修改 DOM。
  *
- * Order matters for the CSS: the backdrop comes first, then the dialogs.
+ * 顺序对 CSS 很重要：遮罩在前，对话框在后。
  */
 export function SideContent() {
   const state = useSideContentState()
 
-  // The parent owns the state transition. Child dialogs stay presentational,
-  // which makes their open/close behavior explicit in the JSX tree.
+  // 状态变更由父组件负责，子对话框保持纯展示，开关行为在 JSX 中一目了然
   const handleClose = () => closeSideContentDialog()
 
   return (
@@ -40,7 +34,7 @@ export function SideContent() {
   )
 }
 
-/** `.mdl-dialog-back` */
+/** `.mdl-dialog-back` 遮罩。 */
 function DialogBackdrop({ shown }: { shown: boolean }) {
   return (
     <div

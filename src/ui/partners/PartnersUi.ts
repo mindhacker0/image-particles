@@ -5,33 +5,11 @@ import { partnersNodes } from './nodes'
 import { getPartnersState, setPartnersState, type PartnerEntry, type PartnerItem } from './state'
 
 /**
+ * 伙伴界面的门面，供引擎按原有 API 调用（`ChapterUi` 持有实例并调用
+ * `resize()` / `open()`）。
  *
- * Legacy compatible facade of the partners screen. The original class owned the
- * markup (it looked the nodes up in its constructor and mutated them with
- * `classList` and inline styles); the markup is React's now (`Partners.tsx`) and
- * this facade drives it through the store of `state.ts`, reading the nodes from
- * the registry of `nodes.ts` — exactly the split `src/ui/ChapterUi.ts` uses for
- * the main interface.
- *
- * Public API kept identical (`ChapterUi` owns the instance and calls
- * `this.partners.resize()` / `this.partners.open()`):
- *   members  container, container_ul, loading, xhr, panelH, opened, close_button,
- *            preloader, popuCount, popuNum, data
- *   methods  constructor(), resize(), close(), onClose(ev), addPartners(),
- *            populate(json), open()
- *
- * Port notes
- * ----------
- * - the four DOM members are getters over `partnersNodes` instead of constructor
- *   snapshots: React creates the nodes, so they only exist from the first mount on
- * - `container.style.height` and `container_ul.style.marginLeft` (written by
- *   `resize`) are store fields (`panelHeight`, `listMarginLeft`) rendered by the
- *   component; `panelH` still holds the height like the original member did
- * - the `close_button.addEventListener('click', this.onClose)` of the constructor
- *   is the `onClick` of the component, so no listener is bound here
- * - `/freefall/partners` is still requested with `Twix.ajax` on the first
- *   `open()`, and the global names `windowHeight` / `windowWidth` are still read
- *   for `resize` (both are owned by `src/engine/Main.ts`)
+ * 标记由 `Partners.tsx` 渲染：本类通过 `nodes.ts` 的注册表读取节点，
+ * 通过 `state.ts` 的 store 驱动界面。
  */
 
 function windowWidth(): number {
@@ -48,58 +26,56 @@ const PARTNER_URL_QUERY = '?utm_campaign=cilex_v1&utm_source=cilab&utm_medium=ar
 let instance: PartnersUi | null = null
 
 /**
- * The instance `ChapterUi` created, for `Partners.tsx` (the components cannot
- * receive it as a prop: the legacy engine instantiates the facade itself, the
- * same reason `src/ui/controller.ts` exists for `ChapterUi`).
+ * `ChapterUi` 创建的实例，供 `Partners.tsx` 使用
+ * （引擎自己实例化门面，组件无法通过 props 拿到它）。
  */
 export function getPartnersUi(): PartnersUi | null {
   return instance
 }
 
 export class PartnersUi {
-  /** `.partners` — legacy `this.container` */
+  /** `.partners` 容器。 */
   get container(): HTMLElement | null {
     return partnersNodes.container
   }
 
-  /** `.partners ul` — legacy `this.container_ul` */
+  /** `.partners ul` 列表。 */
   get container_ul(): HTMLElement | null {
     return partnersNodes.containerUl
   }
 
-  /** `.partners button` — legacy `this.close_button` */
+  /** `.partners` 的关闭按钮。 */
   get close_button(): HTMLElement | null {
     return partnersNodes.closeButton
   }
 
-  /** `.partners .mdl-spinner` — legacy `this.preloader` */
+  /** `.partners` 的加载指示器。 */
   get preloader(): HTMLElement | null {
     return partnersNodes.preloader
   }
 
   /**
-   * `true` once the request has been sent. Kept 1:1: the original never reset it,
-   * so a later `open()` neither fetches nor shows the spinner again — the rows
-   * stay in the store, exactly like they stayed in the `<ul>`.
+   * 请求是否已发送。一旦置为 `true` 便不再重置，之后的 `open()` 不会再次请求或
+   * 显示 spinner，已展示的行继续保留。
    */
   loading = false
 
-  /** the pending `/freefall/partners` request (never aborted by the original) */
+  /** 进行中的 `/freefall/partners` 请求。 */
   xhr: LegacyRequest | null = null
 
-  /** height `resize` applies to `.partners` (default of the original member) */
+  /** `resize` 应用到 `.partners` 的高度。 */
   panelH = 400
 
-  /** `true` while the panel is open */
+  /** 面板是否打开。 */
   opened = false
 
-  /** rows already revealed */
+  /** 已展示的行数。 */
   popuCount = 0
 
-  /** rows revealed per batch (10 in the original) */
+  /** 每批展示的行数。 */
   popuNum = 10
 
-  /** parsed `/freefall/partners` response, `null` until it arrives */
+  /** 解析后的 `/freefall/partners` 响应；到达前为 `null`。 */
   data: PartnerItem[] | null = null
 
   constructor() {
@@ -139,8 +115,7 @@ export class PartnersUi {
     const loadTot = dest - this.popuCount
     let loadCount = 0
 
-    // `params.directChapter` cannot change between two batches, so it is read
-    // once (the original read the global on every iteration of the loop)
+    // `params.directChapter` 在两批之间不会变化，因此只读取一次
     const directChapter = String(legacyParams().directChapter)
 
     const entries: PartnerEntry[] = []
@@ -156,9 +131,7 @@ export class PartnersUi {
         title: item.title,
       })
 
-      // the original used the `Image` object to append the `<img>` of the row; the
-      // markup is React's now, so the preload only paces the batches: the next one
-      // starts when every logo of the current one has been fetched
+      // 用 `Image` 预加载来划分批次：当前批次的 logo 全部取回后再开始下一批
       const image = new Image()
 
       const onLoaded = () => {
@@ -170,16 +143,12 @@ export class PartnersUi {
       }
 
       image.onload = onLoaded
-      // FIX: the original only handled `onload`, so a single logo that failed to
-      // load (no backend, a removed partner, a blocked CDN) left the batch
-      // incomplete and stopped the queue for good. A failed logo is revealed too,
-      // so the batch always completes.
+      // 加载失败的 logo 也计入完成，保证批次总能推进，不会中断队列
       image.onerror = onLoaded
       image.src = imageUrl
     }
 
-    // the rows were appended to the `<ul>` inside the loop; here the batch is
-    // published in one update (same visible result, one render)
+    // 整批行一次性发布，渲染一次即可
     setPartnersState({ partners: [...getPartnersState().partners, ...entries] })
   }
 
@@ -189,16 +158,14 @@ export class PartnersUi {
     try {
       parsed = JSON.parse(json)
     } catch (cause) {
-      // FIX: the original parsed inside the ajax callback, so a malformed body
-      // threw there. The spinner is stopped and the panel stays empty instead.
+      // 解析失败时停止 spinner，面板保持为空
       console.error('[PartnersUi] could not parse the /freefall/partners response', cause)
       setPartnersState({ loading: false })
       return
     }
 
     if (!Array.isArray(parsed)) {
-      // the original assigned the value and returned silently (`this.data.length`
-      // was `undefined`, so `addPartners` looped zero times)
+      // 响应不是数组时视为无数据，停止 spinner
       console.warn('[PartnersUi] unexpected /freefall/partners response, expected an array', parsed)
       this.data = null
       setPartnersState({ loading: false })
@@ -223,10 +190,7 @@ export class PartnersUi {
         type: 'GET',
         url: '/freefall/partners',
         success: (json) => this.populate(json),
-        // FIX: the original passed no `error` callback, so a failed request (the
-        // mock deployment has no `/freefall/partners` route) left the spinner
-        // spinning forever over an empty panel. The panel still opens and stays
-        // usable, it just shows no partner (graceful degradation).
+        // 请求失败时停止 spinner，面板仍可打开（优雅降级）
         error: (status) => {
           console.warn(`[PartnersUi] GET /freefall/partners failed (status ${status})`)
           setPartnersState({ loading: false })
@@ -237,7 +201,3 @@ export class PartnersUi {
     setPartnersState({ partnersOpened: true, closeButtonShown: true })
   }
 }
-
-// `js/ui/partners_ui.js` declared the class as the global `PartnersUi`; the port
-// imports it where it is used (`src/ui/ChapterUi.ts`) instead of relying on a
-// global name.

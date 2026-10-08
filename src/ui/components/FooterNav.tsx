@@ -3,11 +3,10 @@ import { setUiState, useUiState } from '../store'
 import { uiNodes } from '../uiNodes'
 
 /**
- * Footer map menu (3D/2D toggle) and the partners link, moved from `index.html`.
+ * 底部地图菜单（3D/2D 切换）与伙伴链接。
  *
- * The original markup had no `.rotation-toggle` button in this page, so only the
- * space toggle is rendered (the `ChapterUi` facade still exposes the rotation
- * methods for the chapters that do have it).
+ * 本页标记没有 `.rotation-toggle` 按钮，因此只渲染空间切换按钮
+ * （`ChapterUi` 门面仍保留旋转相关方法，供有此按钮的章节使用）。
  */
 
 interface FooterNavProps {
@@ -49,7 +48,7 @@ export function FooterNav({ onSpaceToggle }: FooterNavProps) {
   )
 }
 
-/** Keeps the 3D/2D label in sync when the chapter changes. */
+/** 章节切换时重置 3D/2D 显示状态。 */
 export function resetThreeDToggle(): void {
   setUiState({ threeD: false })
 }

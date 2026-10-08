@@ -3,12 +3,8 @@ import { EventDispatcher } from './events'
 
 /**
  *
- * Raycast based hover/click tracking over a list of objects. It already
- * extended `EventDispatcher` in the original source, so the port keeps the
- * inheritance and the same event names (`active`, `inactive`, `click`).
- *
- * Nothing instantiates it in this snapshot, but it is published as a global to
- * keep the module surface of the original build intact.
+ * 基于射线检测的对象悬停 / 点击跟踪，继承 `EventDispatcher`，
+ * 事件名称为 `active`、`inactive`、`click`。
  */
 export class InteractiveObjects<
   TObject extends Object3D = Object3D,
@@ -40,22 +36,26 @@ export class InteractiveObjects<
     this.mouseUpHandler = this.onDocumentMouseUp.bind(this)
   }
 
+  /** 开始监听文档鼠标事件。 */
   start(): void {
     document.addEventListener('mousemove', this.mouseMoveHandler, false)
     document.addEventListener('mousedown', this.mouseDownHandler, false)
     document.addEventListener('mouseup', this.mouseUpHandler, false)
   }
 
+  /** 停止监听鼠标事件。 */
   stop(): void {
     document.removeEventListener('mousemove', this.mouseMoveHandler, false)
     document.removeEventListener('mousedown', this.mouseDownHandler, false)
     document.removeEventListener('mouseup', this.mouseUpHandler, false)
   }
 
+  /** 加入参与检测的对象。 */
   add(object: TObject): void {
     this.objects.push(object)
   }
 
+  /** 更新鼠标归一化坐标并检测相交。 */
   onDocumentMouseMove(event: MouseEvent): void {
     event.preventDefault()
     this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1
@@ -63,10 +63,12 @@ export class InteractiveObjects<
     this.checkMouseIntersections()
   }
 
+  /** 鼠标按下时暂停检测。 */
   onDocumentMouseDown(): void {
     this.isMouseDown = true
   }
 
+  /** 鼠标抬起时把当前活动对象作为点击事件派发。 */
   onDocumentMouseUp(): void {
     this.isMouseDown = false
 
@@ -75,13 +77,14 @@ export class InteractiveObjects<
     }
   }
 
+  /** 检测射线与对象的相交，派发 active / inactive 事件。 */
   checkMouseIntersections(): void {
     if (this.isMouseDown) return
 
-    // reset current actives
+    // 重置当前活动项
     const hovered: TObject[] = []
 
-    // get items hovered
+    // 取被悬停的对象
     this.raycaster.setFromCamera(this.mouse, this.camera as never)
     const intersects = this.raycaster.intersectObjects(this.objects as unknown as Object3D[])
 
@@ -104,17 +107,17 @@ export class InteractiveObjects<
       }
     }
 
-    // previously active and not in new hovered list
+    // 之前在活动列表中、现已不再悬停
     for (const object of disactivated) {
       this.dispatch('inactive', { object })
     }
 
-    // newly activated
+    // 新进入活动列表
     for (const object of activated) {
       this.dispatch('active', { object })
     }
 
-    // set new list of active items
+    // 更新活动列表
     this.actives = hovered
   }
 }

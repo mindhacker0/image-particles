@@ -5,17 +5,9 @@ import { MODMesh } from './MODMesh'
 import { highlight, resetHighlight } from './utils'
 
 /**
- * Ported from `js/atlas/mod.js`.
- *
- * "Mesh On Demand" utility that loads new assets into an atlas. It is dead code
- * in this snapshot (`js/atlas/atlas.js` keeps its instantiation commented out)
- * and it calls a `LODTexture` API of an older revision, which is why the
- * texture calls below are guarded/optional.
- *
- * Two latent bugs of the original are fixed here and marked with a comment:
- *   * `clear()` referenced an undeclared global `mesh` instead of `this.mesh`;
- *   * `removeCanvasDebug()` assigned the undeclared identifier `none` instead of
- *     the string `'none'`.
+ * "Mesh On Demand"：按需向图集加载新资产的工具。
+ * 目前为死代码（`Atlas` 中未启用），且依赖旧版 `LODTexture` API，
+ * 因此下面访问纹理时做了可选链保护。
  */
 export class MOD {
   showDebug: boolean
@@ -30,7 +22,7 @@ export class MOD {
       this.showCanvasDebug(this.mesh.texture as unknown as CanvasTextureLike, 0, 256)
     }
 
-    // event dispatcher to alert
+    // 用于通知外部的事件派发器
     this.events = new EventDispatcher()
   }
 
@@ -44,24 +36,22 @@ export class MOD {
   }
 
   removeCanvasDebug(texture: CanvasTextureLike): void {
-    // the original assigned the undeclared identifier `none`
     texture.canvas.style.display = 'none'
     document.body.removeChild(texture.canvas)
   }
 
   clear(): void {
-    // the original referenced an undeclared global `mesh`
     ;(this.mesh.texture as unknown as { clear?(): void }).clear?.()
   }
 
   setFromIds(ids: string[]): void {
-    // get items that are currently on screen
+    // 获取当前在屏幕上的项
     if (this.showDebug) {
       resetHighlight()
       highlight(ids, new Color(0, 1, 0))
     }
 
-    // limit the number of assets to this texture's capability
+    // 按纹理容量限制资产数量
     const texture = this.mesh.texture as unknown as {
       getNumItemsMax?(): number
       updateList?(list: string[], updated: boolean): void
@@ -74,13 +64,5 @@ export class MOD {
     }
 
     texture.updateList?.(ids, true)
-
-    // dispatch event if range has at least one item
-    // if (ids.length) {
-    //   this.events.dispatch('update', {
-    //     assets: ids,
-    //     size: this.mesh.texture.assetSize
-    //   });
-    // }
   }
 }

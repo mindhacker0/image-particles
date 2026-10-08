@@ -1,9 +1,6 @@
 import { ShaderMaterial, type IUniform, type Texture as ThreeTexture } from 'three'
 
-/**
- * The original exposed the module as the `MetaDataMaterial` global with a single
- * `getMaterial(texture)` factory.
- */
+/** 元数据标签使用的材质工厂：`getMaterial(texture)` 返回带 alpha 的 shader 材质。 */
 
 const MetadataMaterialVertexShader = `
   precision highp float;

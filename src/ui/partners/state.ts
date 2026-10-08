@@ -1,55 +1,46 @@
 import { useSyncExternalStore } from 'react'
 
 /**
- *
- * Observable state of the partners screen, the feature-local twin of
- * `src/ui/store.ts` (same shape: module state + `getX()` / `subscribeX()` /
- * `setX()` + a `useSyncExternalStore` hook). `PartnersUi` is the only writer and
- * `Partners.tsx` the only reader.
- *
- * Every field mirrors one DOM write of the legacy class:
- *   `.partners.open`                     <- open() / close()
- *   `.partners button.show`              <- open() / close()
- *   `.partners .mdl-spinner.is-active`   <- open() (added) / populate() (removed)
- *   `.partners` inline `height`          <- resize()
- *   `.partners ul` inline `margin-left`  <- resize()
- *   the `li > a > img` rows              <- addPartners()
+ * 伙伴界面的可观察状态，是 `src/ui/store.ts` 的局部对应物
+ * （同样由模块状态、`getX()` / `subscribeX()` / `setX()` 和
+ * `useSyncExternalStore` Hook 组成）。`PartnersUi` 是唯一写入方，
+ * `Partners.tsx` 是唯一读取方。
  */
 
-/** One row of the `/freefall/partners` response (legacy `this.data[i]`). */
+/** `/freefall/partners` 响应中的一行。 */
 export interface PartnerItem {
-  /** partner slug: used in the partner url */
+  /** 伙伴标识，用于拼接伙伴页面 URL。 */
   url: string
-  /** logo url; the legacy code appended the `-s64` size suffix to it */
+  /** logo 地址；使用时拼上 `-s64` 尺寸后缀。 */
   logo: string
-  /** alt text of the logo */
+  /** logo 的替代文本。 */
   title: string
 }
 
-/** A partner row ready to render: the legacy `li > a > img` of `addPartners`. */
+/** 可直接渲染的伙伴行（`li > a > img`）。 */
 export interface PartnerEntry {
-  /** partner slug (legacy `nodeLink.idLink`) */
+  /** 伙伴标识。 */
   url: string
-  /** link built like the legacy one, from `params.directChapter` */
+  /** 由 `params.directChapter` 拼出的链接。 */
   href: string
-  /** `item.logo + '-s64'`, the `src` of the logo */
+  /** logo 的 `src`（`logo` 加 `-s64` 后缀）。 */
   imageUrl: string
-  /** `item.title`, the `alt` of the logo */
+  /** logo 的 `alt`。 */
   title: string
 }
 
 export interface PartnersState {
-  /** `.partners.open`: the panel covers the screen */
+  /** 面板是否铺满屏幕（`.partners.open`）。 */
   partnersOpened: boolean
-  /** `.partners button.show`: the close button is revealed */
+  /** 关闭按钮是否显示（`.partners button.show`）。 */
   closeButtonShown: boolean
-  /** `.partners .mdl-spinner.is-active`: the request has not answered yet */
+  /** 请求是否进行中（`.partners .mdl-spinner.is-active`）。 */
   loading: boolean
-  /** inline height of `.partners`, in px (`resize`) */
+  /** `.partners` 的内联高度（px）。 */
   panelHeight: number
-  /** inline margin-left of `.partners ul`, in px (`resize`) */
+  /** `.partners ul` 的内联左边距（px）。 */
   listMarginLeft: number
-  /** rows revealed so far: `addPartners` appends them by batches of `popuNum` */
+  /** 已展示的行，`addPartners` 按 `popuNum` 分批追加。 */
   partners: PartnerEntry[]
 }
 
@@ -70,6 +61,7 @@ export function getPartnersState(): PartnersState {
   return state
 }
 
+/** 订阅状态变化，返回取消订阅函数。 */
 export function subscribePartners(listener: () => void): () => void {
   listeners.add(listener)
   return () => {
@@ -82,7 +74,7 @@ export function setPartnersState(patch: Partial<PartnersState>): void {
   listeners.forEach((listener) => listener())
 }
 
-/** React hook used by the partners component. */
+/** 供伙伴组件使用的 React Hook。 */
 export function usePartnersState(): PartnersState {
   return useSyncExternalStore(subscribePartners, getPartnersState, getPartnersState)
 }

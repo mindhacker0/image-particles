@@ -1,11 +1,11 @@
 /**
  *
- * The utilities the original classic script declared in the global scope, now
- * imported as ESM by the modules that use them.
+ * 通用工具函数。
  */
 
 export const supportsPassive = false
 
+/** 写入 cookie；`days` 为可选的有效天数。 */
 export function createCookie(name: string, value: string, days?: number): void {
   let expires = ''
 
@@ -18,6 +18,7 @@ export function createCookie(name: string, value: string, days?: number): void {
   document.cookie = name + '=' + value + expires + '; path=/'
 }
 
+/** 读取 cookie，不存在时返回 null。 */
 export function readCookie(name: string): string | null {
   const nameEQ = name + '='
   const chunks = document.cookie.split(';')
@@ -31,15 +32,17 @@ export function readCookie(name: string): string | null {
   return null
 }
 
+/** 删除 cookie。 */
 export function eraseCookie(name: string): void {
   createCookie(name, '', -1)
 }
 
+/** 当前页面 url，去掉特殊字符。 */
 export function getCurrentUrl(): string {
   return window.location.href.replace(/[|;$@"'<>?()=+]/g, '')
 }
 
-/** Shape of the wheel events the legacy code inspects. */
+/** 滚轮事件的字段形状（兼容各浏览器的不同属性）。 */
 export interface LegacyWheelEvent {
   detail?: number
   wheelDelta?: number
@@ -63,19 +66,20 @@ const PIXEL_STEP = 10
 const LINE_HEIGHT = 40
 const PAGE_HEIGHT = 800
 
+/** 把各浏览器形态的滚轮事件归一化为格数与像素滚动量。 */
 export function normalizeWheel(event: LegacyWheelEvent): NormalizedWheel {
   let sX = 0
   let sY = 0
   let pX = 0
   let pY = 0
 
-  // Legacy
+  // 旧式事件字段
   if ('detail' in event) { sY = event.detail as number }
   if ('wheelDelta' in event) { sY = -(event.wheelDelta as number) / 120 }
   if ('wheelDeltaY' in event) { sY = -(event.wheelDeltaY as number) / 120 }
   if ('wheelDeltaX' in event) { sX = -(event.wheelDeltaX as number) / 120 }
 
-  // side scrolling on FF with DOMMouseScroll
+  // Firefox 下 DOMMouseScroll 的横向滚动
   if ('axis' in event && event.axis === event.HORIZONTAL_AXIS) {
     sX = sY
     sY = 0
@@ -89,17 +93,17 @@ export function normalizeWheel(event: LegacyWheelEvent): NormalizedWheel {
 
   if ((pX || pY) && event.deltaMode) {
     if (event.deltaMode === 1) {
-      // delta in LINE units
+      // delta 以行(LINE)为单位
       pX *= LINE_HEIGHT
       pY *= LINE_HEIGHT
     } else {
-      // delta in PAGE units
+      // delta 以页(PAGE)为单位
       pX *= PAGE_HEIGHT
       pY *= PAGE_HEIGHT
     }
   }
 
-  // Fall-back if spin cannot be determined
+  // 无法确定滚动方向时的兜底
   if (pX && !sX) { sX = (pX < 1) ? -1 : 1 }
   if (!sY && event.deltaY) { sY = event.deltaY }
 

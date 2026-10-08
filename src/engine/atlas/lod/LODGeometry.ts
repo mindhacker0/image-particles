@@ -10,10 +10,7 @@ import type { Asset } from '../Asset'
 import type { LODDescriptor } from './helpers/LODDescriptor'
 
 /**
- *
- * Instanced geometry of one level of detail: one tile per image descriptor.
- * The legacy code used the pre-r125 names (`maxInstancedCount`, `addAttribute`,
- * `setDynamic`); the port uses the current API.
+ * 某一细节层级的实例化几何体：每个图像描述符对应一个图块。
  */
 
 const planeGeom = new PlaneGeometry(1, 1)
@@ -31,20 +28,20 @@ export class LODGeometry {
   updateFlags: { position: boolean; color: boolean; tween: boolean }
   attributes: Record<string, InstancedBufferAttribute> = {}
   currPosition = 0
-  // list of assets being displayed
+  // 当前正在显示的资产列表
   assetList: Asset[] = []
 
   constructor(desc: LODDescriptor) {
     this.desc = desc
     this.tileSize = this.desc.tileSize
 
-    // create the instanced buffer geometry
+    // 创建实例化缓冲几何体
     this.geometry = new InstancedBufferGeometry()
-    // `copy` only copies the attributes / index of the plain plane geometry
+    // `copy` 只会复制普通平面几何体的属性 / 索引
     this.geometry.copy(planeGeom as unknown as InstancedBufferGeometry)
     this.geometry.instanceCount = desc.tileCount
 
-    // flags dictionary for assets to report update needs
+    // 用于向资产报告更新需求的标志字典
     this.updateFlags = {
       position: false,
       color: false,
@@ -61,12 +58,12 @@ export class LODGeometry {
 
     for (let i = 0; i < uvAttr.array.length; i++) {
       uvAttr.array[i] /= this.desc.textureSize
-      // set normalization relative to assetSize (required for LOD)
+      // 相对 assetSize 归一化（LOD 需要）
       uvAttr.array[i] *= norm
     }
     uvAttr.needsUpdate = true
 
-    // define the shader attributes topology
+    // 定义着色器属性的结构
     const attributes: GeometryAttributeDescription[] = [
       { name: 'tween', size: 1 },
       { name: 'uvOffset', size: 2 },
@@ -82,7 +79,6 @@ export class LODGeometry {
 
     attributes.forEach(function (attr) {
       const buffer = new Float32Array(geom.instanceCount * attr.size)
-      // (the legacy 3rd argument was meshPerAttribute, which now defaults to 1)
       const buffAttr = new InstancedBufferAttribute(buffer, attr.size)
 
       if (!attr.isStatic) {
@@ -109,21 +105,21 @@ export class LODGeometry {
     let buff: Float32Array
     const scope = this
 
-    // pct
+    // 插值百分比
     this.attributes['tween'].array[i1] = 1
 
-    // coords
+    // 坐标
     const uvOffsets = this.attributes['uvOffset'].array
     uvOffsets[i2] = x / textureSize
     uvOffsets[i2 + 1] = (textureSize - y - h) / textureSize
 
-    // size
+    // 尺寸
     const scale = this.attributes['scale'].array
     scale[i3] = (w / tileSize) * 16
     scale[i3 + 1] = (h / tileSize) * 16
     scale[i3 + 2] = 1
 
-    // translation
+    // 平移
     const p = asset.position
     ;['translate', 'translateDest'].forEach(function (name) {
       buff = scope.attributes[name].array as Float32Array
@@ -132,7 +128,7 @@ export class LODGeometry {
       buff[i3 + 2] = p.z
     })
 
-    // color
+    // 颜色
     const c = asset.color
     ;['color', 'colorDest'].forEach(function (name) {
       buff = scope.attributes[name].array as Float32Array
@@ -141,21 +137,21 @@ export class LODGeometry {
       buff[i3 + 2] = c.b
     })
 
-    // UID for color picking
+    // 用于颜色拾取的 UID
     buff = this.attributes['uidColor'].array as Float32Array
     buff[i3] = ((asset.uid >> 16) & 0xff) / 0xff
     buff[i3 + 1] = ((asset.uid >> 8) & 0xff) / 0xff
     buff[i3 + 2] = (asset.uid & 0xff) / 0xff
 
-    // mark attributes for update
+    // 标记属性需要更新
     for (const attr in this.attributes) {
       this.attributes[attr].needsUpdate = true
     }
 
-    // set asset update flags to this one
+    // 把资产的更新标志指向本几何体
     asset.updateFlags = this.updateFlags
 
-    // stores a reference to the asset
+    // 保存资产的引用
     if (this.assetList.indexOf(asset) !== -1) return
     this.assetList.push(asset)
   }
@@ -168,7 +164,6 @@ export class LODGeometry {
     const positionInbuffer = this.assetList.indexOf(asset)
 
     if (positionInbuffer === -1) {
-      // the original logged `this.lod`, which does not exist on a geometry
       console.warn('hide:', this.desc.lod, "this asset doesn't belong to any geometry")
       return
     }
@@ -216,8 +211,8 @@ export class LODGeometry {
     const scope = this
 
     newAssets.forEach(function (asset) {
-      asset.hide() // remove from default geometry
-      scope.show(asset) // adds to this geometry
+      asset.hide() // 从默认几何体中移除
+      scope.show(asset) // 加入本几何体
     })
 
     this.attributes['scale'].needsUpdate = true
@@ -232,12 +227,12 @@ export class LODGeometry {
     for (let i = 0; i < this.desc.tileCount; i++) {
       const i3 = i * 3
 
-      // position
+      // 位置
       transArr[i3] = transDestArr[i3] * pct + transArr[i3] * (1 - pct)
       transArr[i3 + 1] = transDestArr[i3 + 1] * pct + transArr[i3 + 1] * (1 - pct)
       transArr[i3 + 2] = transDestArr[i3 + 2] * pct + transArr[i3 + 2] * (1 - pct)
 
-      // color
+      // 颜色
       colorArr[i3] = colorDestArr[i3] * pct + colorArr[i3] * (1 - pct)
       colorArr[i3 + 1] = colorDestArr[i3 + 1] * pct + colorArr[i3 + 1] * (1 - pct)
       colorArr[i3 + 2] = colorDestArr[i3 + 2] * pct + colorArr[i3 + 2] * (1 - pct)
@@ -249,10 +244,7 @@ export class LODGeometry {
     markRenderNeeded()
   }
 
-  /**
-   * Kept as in the original, where `assets` is indexed both as an array and as a
-   * dictionary keyed by id, which makes the loop a no-op for object input.
-   */
+  /** 注意：`assets` 既按数组又按 id 字典索引，传入对象时循环实际不会执行。 */
   updateAttribute(
     assets: Record<string, { position: { x: number; y: number; z: number } }>,
     attributeName: string,
@@ -286,11 +278,7 @@ export class LODGeometry {
     this.updateFlags.color = false
   }
 
-  /**
-   * The original read `this.attributes[attributeName]` here, referencing a
-   * variable that only exists in `updateAttribute`, so the method always threw.
-   * It is ported with the obvious intent, the `tween` attribute.
-   */
+  /** 写入 `tween` 属性数组并标记该属性需要更新。 */
   updateTweenAttributes(assets: Array<{ tween?: number }>): void {
     const attr = this.attributes['tween']
 

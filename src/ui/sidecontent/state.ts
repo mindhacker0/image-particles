@@ -1,44 +1,29 @@
 import { useSyncExternalStore } from 'react'
 
 /**
+ * “侧边内容”（帮助 / 应用对话框）的可观察状态，沿用 `src/ui/store.ts` 的模式：
+ * 模块状态、getter、`subscribe()` 与 `useSyncExternalStore` Hook。
  *
- * Observable state of the "side content" (the help / app dialogs that
- * used to live in `index.html`), mirroring the pattern of `src/ui/store.ts`:
- * module state, getters, `subscribe()` and a `useSyncExternalStore` hook.
- *
- * `src/ui/sidecontent/SideContentFacade.ts` (the port of the legacy `Sidect`
- * class) is the only writer, the components of `SideContent.tsx` only read. The
- * legacy class mutated the markup imperatively - `setAttribute('open', '')`,
- * `classList.add('show')`, `input.value = ...`, `setTimeout` - and every one of
- * those mutations is a field below, so React can render them instead.
+ * `SideContentFacade.ts` 是唯一写入方，`SideContent.tsx` 的组件只读取。
  */
 
-/** The three `<dialog class="mdl-dialog ...">` of the page. */
+/** 页面上 `<dialog class="mdl-dialog ...">` 的类型。 */
 export type SideContentDialog = 'help' | 'app'
 
 export interface SideContentState {
-  /** `dialog.help[open]` */
+  /** 帮助对话框是否打开（`dialog.help[open]`）。 */
   helpOpened: boolean
-  /**
-   * `.mdl-dialog-back.show` (the full page backdrop; see the `.show` utility
-   * class of `css/main.css`)
-   */
+  /** 全屏背景遮罩是否显示（`.mdl-dialog-back.show`）。 */
   backShown: boolean
   /**
-   * Item detail panel ("side content" proper) of the original experiment.
-   *
-   * NOTE: `js/ui/sidect.js` does not build or mutate such a panel in this
-   * snapshot - it only looked up the (already removed) `div.pages` container and
-   * never used it, no other module of the repository creates a panel either, and
-   * `css/main.css` has no rule for one. The fields are declared so the metadata
-  * layer can drive one without another store change;
-   * `SideContent.tsx` does not render them yet and the facade never writes them.
+   * 原实验的条目详情面板。当前 `SideContent.tsx` 尚未渲染，门面也不会写入；
+   * 字段先声明，便于后续由元数据层驱动。
    */
   itemOpened: boolean
   itemId: string | null
   itemTitle: string | null
   itemUrl: string | null
-  /** accent colour of the item panel, like `.chaptercolor` is for the dialogs */
+  /** 条目面板的强调色。 */
   itemColor: string | null
 }
 
@@ -60,6 +45,7 @@ export function getSideContentState(): SideContentState {
   return state
 }
 
+/** 订阅状态变化，返回取消订阅函数。 */
 export function subscribeSideContent(listener: () => void): () => void {
   listeners.add(listener)
   return () => {
@@ -72,15 +58,12 @@ export function setSideContentState(patch: Partial<SideContentState>): void {
   listeners.forEach((listener) => listener())
 }
 
-/** React hook used by the components. */
+/** 供组件使用的 React Hook。 */
 export function useSideContentState(): SideContentState {
   return useSyncExternalStore(subscribeSideContent, getSideContentState, getSideContentState)
 }
 
-/**
- * `Sidect.openCurrentDialog`: only one dialog is tracked at a time, so opening
- * one closes the others, and the backdrop is shown with the dialog.
- */
+/** 同一时刻只跟踪一个对话框，打开一个即关闭其他，并显示遮罩。 */
 export function openSideContentDialog(dialog: SideContentDialog): void {
   setSideContentState({
     helpOpened: dialog === 'help',
@@ -88,7 +71,7 @@ export function openSideContentDialog(dialog: SideContentDialog): void {
   })
 }
 
-/** `Sidect.closeCurrentDialog`: no dialog is open and the backdrop is hidden. */
+/** 关闭所有对话框并隐藏遮罩。 */
 export function closeSideContentDialog(): void {
   setSideContentState({
     helpOpened: false,

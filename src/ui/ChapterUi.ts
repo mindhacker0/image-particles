@@ -6,26 +6,19 @@ import { PartnersUi } from './partners/PartnersUi'
 import { setUiState } from './store'
 import { uiNodes } from './uiNodes'
 
-/**
- *
- * The markup used to live in `index.html` and the class toggles were applied with
- * `classList`; here the markup is rendered by React (`src/ui/**`) and the classes
- * come from `src/ui/store.ts`. The public API is kept identical because
- * `js/apps/app_freefall.js` and `js/main.js` still drive the interface through
- * `app.ui` and `getComputedStyle(ui.header_el)`.
- */
+/** 章节主界面的门面，把引擎的界面状态写入 UI store。 */
 
 type SyntheticOrDomEvent = { preventDefault?(): void; stopPropagation?(): void }
 
 export class ChapterUi {
   partners: PartnersUi
 
-  // help
+  // 帮助引导
   helpPlayed = false
   helpRunning = false
   helpStartAnimated = false
 
-  // footer
+  // 底部
   rotationMode = false
   three = false
 
@@ -43,7 +36,7 @@ export class ChapterUi {
     setUiController(this)
   }
 
-  // DOM members the legacy engine reads directly ---------------------------
+  // 引擎会直接读取的 DOM 成员 ---------------------------
 
   get header_el(): HTMLElement | null {
     return uiNodes.header
@@ -81,7 +74,7 @@ export class ChapterUi {
     return uiNodes.spaceToggle
   }
 
-  /** The footer rotation toggle is not part of this page's markup. */
+  /** 本页没有底部旋转切换按钮，固定返回 null。 */
   get rotationToggleButton(): HTMLElement | null {
     return null
   }
@@ -94,7 +87,7 @@ export class ChapterUi {
     this.partners.resize()
   }
 
-  // HEADER ----------------------------------------------------------------
+  // 头部 ----------------------------------------------------------------
 
   showHeader(): void {
     setUiState({ headerVisible: true })
@@ -104,7 +97,7 @@ export class ChapterUi {
     setUiState({ headerVisible: false, footerMapNavShown: false })
   }
 
-  // NAV -------------------------------------------------------------------
+  // 导航 -------------------------------------------------------------------
 
   hideNavs(): void {
     setUiState({ navsOpened: false })
@@ -122,7 +115,7 @@ export class ChapterUi {
     setUiState({ selectedSeq: bt?.getAttribute('data-seq') ?? null })
   }
 
-  // FOOTER ----------------------------------------------------------------
+  // 底部 ----------------------------------------------------------------
 
   rotationShiftPressed(): void {
     if (!this.rotationToggleButton) return
@@ -139,7 +132,7 @@ export class ChapterUi {
   }
 
   showRotationToolTip(): void {
-    // no rotation toggle in this chapter
+    // 本章节没有旋转切换按钮
   }
 
   onRotationToogleEnter(): void {
@@ -168,7 +161,7 @@ export class ChapterUi {
     const checked = !this.three
     legacyCameraControls().onShift(checked)
     this.three = checked
-    // `.threed` is shown while the flat 2D map is active
+    // 处于平面 2D 地图时显示 .threed
     setUiState({ threeD: !checked })
   }
 
@@ -185,7 +178,7 @@ export class ChapterUi {
     setUiState({ footerMapNavShown: false })
   }
 
-  // HELP START ------------------------------------------------------------
+  // 帮助引导 ------------------------------------------------------------
 
   startHelp(delay?: number): boolean {
     if (this.helpRunning) {
@@ -233,7 +226,7 @@ export class ChapterUi {
 
     gsap.to(this.hscontainer, { duration: 0.8, autoAlpha: 1, delay: current })
 
-    // step 1
+    // 步骤 1
     current += 0.5
     gsap.to(this.hsmouse, {
       duration: timeShow,
@@ -256,7 +249,7 @@ export class ChapterUi {
 
     gsap.to(this.hstooltips[0], { duration: timeHide, autoAlpha: 0, delay: current })
 
-    // step 2
+    // 步骤 2
     current += 0.3
     gsap.to(this.hsmousewheel, {
       duration: timeShow,
@@ -295,7 +288,7 @@ export class ChapterUi {
       delay: current,
     })
 
-    // step 3
+    // 步骤 3
     current += 0.5
 
     gsap.to(this.hsartwork, {
@@ -337,7 +330,7 @@ export class ChapterUi {
       onComplete: () => this.onCompleteHelpStart(),
     })
 
-    // got it for 100 days
+    // 记录已读标记，100 天后过期
     createCookie(`cilex-help-gotit${legacyParams().directChapter ?? ''}`, '1', 100)
 
     this.helpPlayed = true
@@ -376,7 +369,7 @@ export class ChapterUi {
     this.onCompleteHelpStart()
   }
 
-  // LOADING ---------------------------------------------------------------
+  // 加载 ---------------------------------------------------------------
 
   stopLoading(): void {
     setUiState({ loading: false })

@@ -2,10 +2,10 @@ import { useEffect, useRef } from 'react'
 import { uiNodes } from '../uiNodes'
 
 /**
- * "Help start" hints, moved from `index.html`.
+ * 帮助引导提示组件。
  *
- * The hints are animated by the `ChapterUi` facade with GSAP (the sequence
- * targets the nodes published in `uiNodes.help`), while React owns the markup.
+ * 提示由 `ChapterUi` 门面用 GSAP 播放（动画目标来自 `uiNodes.help`），
+ * React 只负责标记。
  */
 export function HelpHints() {
   const containerRef = useRef<HTMLDivElement>(null)

@@ -1,22 +1,19 @@
 import { ShaderMaterial, Vector3, type IUniform, type Texture as ThreeTexture } from 'three'
 
 /**
- *
- * Instanced atlas material: the vertex shader interpolates between the current
- * and destination attributes, the fragment shader samples the atlas texture.
+ * 图集实例化材质：顶点着色器在当前与目标 attribute 之间插值，
+ * 片元着色器采样图集纹理。
  */
 
 const MaterialVertexShader = `
   precision mediump float;
 
-  // uniform mat4 modelViewMatrix;
-  // uniform mat4 projectionMatrix;
+  // three 注入的内置 uniform：modelViewMatrix、projectionMatrix
   uniform float transitionPct;
 
   uniform float wavesOffset;
   uniform float wavesAmp;
-  // attribute vec3 position;
-  // attribute vec2 uv;
+  // three 注入的内置 attribute：position、uv
 
   attribute float tween;
   attribute vec2 uvOffset;
@@ -35,16 +32,16 @@ const MaterialVertexShader = `
   #define PI 3.14159
   void main() {
     float pct = transitionPct * tween;
-    vec3 p = mix( translate, translateDest, pct );//translateDest * pct + translate * (1.0 - pct);
+    vec3 p = mix( translate, translateDest, pct );
 
-    //original ( grid )
+    // 原始（网格）版本
     /*
     if (wavesAmp > 0.0) {
       p.y += sin(wavesOffset+p.x/1200.0) * wavesAmp - sin(wavesOffset+p.z/800.0) * wavesAmp;
     }
     //*/
 
-    //modiffied original to work with a disc and the new size
+    // 在原始版本上调整，以适配圆盘造型与新尺寸
     if (wavesAmp > 0.0) {
       p.xz *= 1. + 1.0 * wavesAmp;
       p.y += ( sin(wavesOffset+p.x/1800.0) - sin(wavesOffset+p.z/1600.0 ) ) * wavesAmp * 500.;
@@ -56,12 +53,11 @@ const MaterialVertexShader = `
     mvPosition.xyz += position * scale;
     vUv = uvOffset.xy + uv * scale.xy;
 
-    vColor = mix( color, colorDest, pct );//colorDest * pct + color * (1.0 - pct);
+    vColor = mix( color, colorDest, pct );
 
-    //picking color
+    // 拾取时使用的颜色
     vUidColor = uidColor;
 
-    // vec4 projection = projectionMatrix * mvPosition;
     gl_Position = projectionMatrix * mvPosition;
 
   }
@@ -99,7 +95,7 @@ const MaterialFragmentShader = `
     /*
     else{
     
-        //fog
+        // 雾
         float depth = gl_FragCoord.z / gl_FragCoord.w;
         float d = clamp( 0., 1., pow( depth * ( 1./fogDistance ), 2. ) );
         if( d >= 1. ) discard;
@@ -112,6 +108,7 @@ const MaterialFragmentShader = `
   }
 `
 
+/** 封装图集 shader 材质的工厂。 */
 export class Material {
   material: ShaderMaterial
 
@@ -124,7 +121,7 @@ export class Material {
         wavesAmp: { type: 'f', value: 0.0 },
         renderUidColor: { type: 'f', value: 0.0 },
 
-        ///fog
+        // 雾效
         fogColor: { type: 'v3', value: new Vector3() },
         fogDistance: { type: 'f', value: 100000 },
       } as unknown as { [uniform: string]: IUniform },

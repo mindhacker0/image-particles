@@ -16,37 +16,19 @@ import { atlasInstance, legacyCamera, legacyScene, markRenderNeeded } from '../.
 import { gsap } from 'gsap'
 
 /**
+ * 片头播放时展示的单张作品图片：将图片绘制到方形画布并作为纹理上传，
+ * 再用下方着色器贴到手工构建的四边形上。
+ * `start` 淡入并把自身位置交给元数据标签，使其跟随片头；`stop` 淡出并释放资源。
  *
- * The single artwork shown while the freefall intro plays: an image is drawn into
- * a square canvas, uploaded as a texture and displayed on a hand built quad with
- * the shader below. `start` fades it in and hands its position to the metadata
- * labels so they follow the intro; `stop` fades it out and disposes everything.
- *
- * Port notes:
- * - the module keeps the IIFE shape of the original
- *   (`(function (exports) { ... })({})`) so `introItem` stays a single object
- *   with the same members
- * - the fragment shader declares `uniform sampler2D map` and not `texture`:
- *   three converts GLSL1 shaders to GLSL3 on WebGL2, where `texture2D` maps onto
- *   the built-in `texture()` function, so a uniform named `texture` would break
- *   the compile (black canvas). The original already used `map`; do not change it
- * - `getUrlsDict`, `lod` and `gsap` are imported from their already ported
- *   modules; the still classic globals (`scene`, `camera`, `renderer`,
- *   `renderNeeded`, `atlas`, `window.URL`) are read through small getters at the
- *   end of this file or through `src/engine/legacyScope.ts`
- * - `material.uniforms.needsUpdate = true` of the original was a no-op (the flag
- *   is `uniformsNeedUpdate` on the material), so the modern flag is set instead:
- *   the intended uniform refresh still happens
- * - `BufferGeometry#needsUpdate = true` of the original is dropped: the member
- *   never existed on `BufferGeometry` and does not exist in current three either
- * - `addAttribute` is `setAttribute` since three r125 and the unused
- *   `PlaneBufferGeometry` left over in the module is now a `PlaneGeometry`
+ * 着色器中的 uniform 命名为 `map` 而非 `texture`：
+ * WebGL2 上 three 会把 GLSL1 转为 GLSL3，`texture2D` 映射到内置的 `texture()`，
+ * 命名为 `texture` 会导致编译失败（画面全黑），请勿修改。
  */
 
-/** The parts of an atlas asset (`src/engine/atlas/Asset.ts`) this module reads. */
+/** 本模块读取的资源字段。 */
 type IntroItemAsset = Pick<Asset, 'id' | 'sizeNorm' | 'coords'>
 
-/** The public surface of the module, i.e. the legacy `introItem` object. */
+/** 模块对外暴露的接口（即 `introItem` 对象）。 */
 export interface IntroItem {
   ready: boolean
   position: Vector3
@@ -82,21 +64,12 @@ export const introItem: IntroItem = (function (exports: IntroItem) {
     exports.ready = true
   }
   exports.onUrlLoaded = function (urls) {
-    // `urls` is only used by the commented out request below, as in the original
+    // `urls` 未使用（原网络请求已移除）
     img = new Image()
     img.onload = function () {
       exports.buildMesh()
     }
     img.src = 'data/berekhat_ram.jpg'
-
-    /*
-    var url = urls[ asset.id ].replace( 'http:', 'https:' ) + "=s" + size;
-    xhr = new XMLHttpRequest();
-    xhr.onload = exports.onImageLoaded;
-    xhr.open('GET', url, true);
-    xhr.responseType = 'blob';
-    xhr.send();
-    //*/
   }
 
   exports.onImageLoaded = function () {
@@ -122,9 +95,6 @@ export const introItem: IntroItem = (function (exports: IntroItem) {
     if (callback) {
       callback()
     }
-    //console.log( asset );
-    // console.log(mesh);
-    // console.log( material);
   }
 
   exports.start = function (duration) {
@@ -132,7 +102,7 @@ export const introItem: IntroItem = (function (exports: IntroItem) {
     material.uniforms.opacity.value = 0
     gsap.to(material.uniforms.opacity, { duration: duration || 1, value: 1 })
 
-    // dispatch an event to update the metadata
+    // 派发事件以更新元数据
     const assetsBySize: Record<string, string[]> = {}
     assetsBySize[size] = [asset.id]
     lod.events.dispatch('update', { assets: assetsBySize })
@@ -163,14 +133,13 @@ export const introItem: IntroItem = (function (exports: IntroItem) {
     })
 
     material.uniforms.positionOffset.value = exports.position
-    // the original wrote `material.uniforms.needsUpdate = true`, which three
-    // never supported: the flag lives on the material
+    // 标志在 material 上（three 不支持 `uniforms.needsUpdate`）
     material.uniformsNeedUpdate = true
     mesh.lookAt(legacyCamera().position)
     markRenderNeeded()
   }
 
-  //deletes the object and resources
+  // 删除对象并释放资源
   exports.dispose = function () {
     legacyScene().remove(mesh)
     material.uniforms.map.value.dispose()
@@ -178,7 +147,7 @@ export const introItem: IntroItem = (function (exports: IntroItem) {
     geometry.dispose()
   }
 
-  // create the material
+  // 创建材质
   exports.buildMaterial = function (img) {
     const canvas = document.createElement('canvas')
     canvas.width = canvas.height = size
@@ -186,11 +155,11 @@ export const introItem: IntroItem = (function (exports: IntroItem) {
     const ctx = canvas.getContext('2d') as CanvasRenderingContext2D
     ctx.drawImage(img, 0, 0, img.width, img.height, 0, 0, size, size)
 
-    // update the canvas to the gc < ..?
+    // 用画布创建纹理
     const texture = new Texture(canvas)
     texture.needsUpdate = true
 
-    // create the material
+    // 创建材质
     return new ShaderMaterial({
       uniforms: {
         map: { type: 't', value: texture },
@@ -208,9 +177,9 @@ export const introItem: IntroItem = (function (exports: IntroItem) {
     })
   }
 
-  // create the geometry
-  // (dead left over of the original: `buildGeometry` below builds its own
-  // geometry. `PlaneBufferGeometry` was removed in three r144 -> `PlaneGeometry`)
+  // 创建几何体
+  // （遗留的未使用几何体：`buildGeometry` 会构建自己的几何体；
+  // `PlaneBufferGeometry` 在 three r144 中移除，改用 `PlaneGeometry`）
   const planeGeom = new PlaneGeometry(1, 1)
   exports.buildGeometry = function (width, height) {
     const vertices = new Float32Array(4 * 3)
@@ -236,17 +205,17 @@ export const introItem: IntroItem = (function (exports: IntroItem) {
     vertices[k++] = 0
 
     k = 0
-    uvs[k++] = 0 //rect.fit.x / totalWidth;
-    uvs[k++] = 0 //1 - (rect.fit.y + rect.h) / totalHeight;
+    uvs[k++] = 0
+    uvs[k++] = 0
 
-    uvs[k++] = 1 //(rect.fit.x + rect.w) / totalWidth;
-    uvs[k++] = 0 //1 - (rect.fit.y + rect.h) / totalHeight;
+    uvs[k++] = 1
+    uvs[k++] = 0
 
-    uvs[k++] = 0 //rect.fit.x / totalWidth;
-    uvs[k++] = 1 //1 - rect.fit.y / totalHeight;
+    uvs[k++] = 0
+    uvs[k++] = 1
 
-    uvs[k++] = 1 //(rect.fit.x + rect.w) / totalWidth;
-    uvs[k++] = 1 //1 - rect.fit.y / totalHeight;
+    uvs[k++] = 1
+    uvs[k++] = 1
 
     k = 0
     v = 0
@@ -258,18 +227,17 @@ export const introItem: IntroItem = (function (exports: IntroItem) {
     indices[k++] = v + 1
 
     const geometry = new BufferGeometry()
-    // `addAttribute` was renamed to `setAttribute` in three r125
+    // three r125 起 `addAttribute` 更名为 `setAttribute`
     geometry.setAttribute('uv', new BufferAttribute(uvs, 2))
     geometry.setAttribute('position', new BufferAttribute(vertices, 3))
     geometry.setIndex(new BufferAttribute(indices, 1))
-    // the original also wrote `geometry.needsUpdate = true`: `BufferGeometry`
-    // never carried that member, so the line is dropped
+    // `BufferGeometry` 没有 `needsUpdate` 成员，故不设置
     return geometry
   }
 
-  // `vs` / `fs` are referenced by `buildMaterial`, which only runs after the IIFE
+  // `vs` / `fs` 由 `buildMaterial` 使用，而后者在 IIFE 执行后才运行
   const vs = `
-// attribute vec2 offset;
+// three 注入的内置 attribute：position、uv
 varying vec2 vUv;
 uniform float ratio;
 uniform vec3 scale;
@@ -283,7 +251,7 @@ void main() {
 	transform.xyz *= scale;
 	transform.xyz += positionOffset;
 	
-	//project position
+	// 投影位置
 	vec4 projection = projectionMatrix * transform;
 	gl_Position = projection;
 }`
@@ -292,17 +260,17 @@ void main() {
 uniform vec3 fogColor;
 uniform float fogDistance;
   
-// texture is reserved: three converts GLSL1 shaders to GLSL3 on WebGL2,
-// where texture2D maps onto the built-in texture() function.
+// 不能命名为 texture：three 在 WebGL2 上把 GLSL1 转成 GLSL3，
+// 其中 texture2D 映射到内置的 texture() 函数。
 uniform sampler2D map;
 uniform float opacity;
 varying vec2 vUv;
 void main(){
 
-    //texture
+    // 采样纹理
     vec4 color = texture2D( map, vUv );
     
-    //blend
+    // 与雾色混合
     gl_FragColor = vec4( color.rgb, opacity );
     
 }`
@@ -311,8 +279,7 @@ void main(){
 })({} as IntroItem)
 
 /**
- * `atlas` (`js/atlas/atlas.js`): the intro item moves the metadata labels of the
- * atlas onto its own position, so only `mdLabels.labels` is read here.
+ * 片头条目会把元数据标签移动到自身位置，因此这里只读取 `mdLabels.labels`。
  */
 function atlasMdLabels(): MetadataLabel[] {
   return (atlasInstance() as unknown as { mdLabels: { labels: MetadataLabel[] } }).mdLabels.labels

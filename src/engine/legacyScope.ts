@@ -4,11 +4,10 @@ import { Model, getImages as getModelImages } from './data/Models'
 import { app, atlas, camera, params, scene, shared } from './Main'
 
 /**
- * Typed access to the engine state shared between modules.
+ * 对模块间共享的引擎状态做类型化访问。
  *
- * The values live in the modules that own them (`Main` for the camera / scene /
- * renderer / application, `CameraControls` for the controls, `data/Models` for
- * the item table) and are imported here as ESM bindings.
+ * 状态实际由各自的模块持有（`Main` 持有相机 / 场景 / 渲染器 / 应用，
+ * `CameraControls` 持有控制器，`data/Models` 持有数据表），这里只负责类型化读取。
  */
 
 export interface FormulaAsset {
@@ -35,12 +34,12 @@ export type GetImages = (
   callback: (urls: Record<string, string>) => void,
 ) => void
 
-/** `renderNeeded` is set when a frame has to be rendered (`Main.animate`). */
+/** 需要渲染一帧时置位（由 `Main.animate` 使用）。 */
 export function markRenderNeeded(): void {
   shared.renderNeeded = true
 }
 
-/** Page parameters built by `js/main.js` (query string + body attributes). */
+/** 页面参数（由查询字符串和 body 属性构成）。 */
 export interface LegacyParams {
   isBigWallVersion?: boolean
   initHash?: string
@@ -49,11 +48,12 @@ export interface LegacyParams {
   [key: string]: unknown
 }
 
+/** 页面参数访问器。 */
 export function legacyParams(): LegacyParams {
   return params as unknown as LegacyParams
 }
 
-/** The camera created by `initTHREE` in `js/main.js`. */
+/** 相机（用到 `position` 与 `far`）。 */
 export function legacyCamera(): {
   position: Vector3
   far: number
@@ -61,7 +61,7 @@ export function legacyCamera(): {
   return camera as unknown as { position: Vector3; far: number }
 }
 
-/** The scene created by `initTHREE` in `js/main.js`. */
+/** 场景（用到 `add` 与 `remove`）。 */
 export function legacyScene(): {
   add(object: unknown): void
   remove(object: unknown): void
@@ -69,7 +69,7 @@ export function legacyScene(): {
   return scene as unknown as { add(object: unknown): void; remove(object: unknown): void }
 }
 
-/** Camera controls owned by `js/camera/cameraControls.js`. */
+/** 相机控制器。 */
 export function legacyCameraControls(): {
   tweening: boolean
   toUrl(): void
@@ -84,27 +84,27 @@ export function legacyCameraControls(): {
   }
 }
 
-/** The application object built by `js/apps/app_freefall.js`. */
+/** 应用对象（`prevSeq` 记录上一段序列）。 */
 export function legacyApp(): { prevSeq?: string | null } {
   return app as unknown as { prevSeq?: string | null }
 }
 
-/** The atlas instance currently being built. */
+/** 当前正在构建的图集实例。 */
 export function atlasInstance(): AtlasInstance {
   return atlas as unknown as AtlasInstance
 }
 
-/** Assets of the atlas currently being built. */
+/** 当前图集的资源列表。 */
 export function atlasAssets(): FormulaAsset[] {
   return atlasInstance().assets
 }
 
-/** Items metadata table loaded by the model layer. */
+/** 模型层加载的条目元数据表。 */
 export function modelItems(): Record<string, ModelItem> {
   return Model.items as unknown as Record<string, ModelItem>
 }
 
-/** Image url resolver owned by the model layer. */
+/** 模型层的图片地址解析函数。 */
 export function getImages(): GetImages {
   return getModelImages as unknown as GetImages
 }

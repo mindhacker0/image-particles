@@ -1,13 +1,12 @@
 /**
- * Registry of the DOM nodes the React UI renders.
+ * React 界面渲染出的 DOM 节点注册表。
  *
- * The not-yet-ported part of the engine (`app_freefall.js`) talks to the UI
- * through DOM elements: it attaches its click listeners to `ui.buttons`, reads
- * `ui.header_el` for the chapter colour and animates the help hints with GSAP.
- * The components publish their nodes here so the `ChapterUi` facade can expose
- * exactly those members while React keeps ownership of the markup.
+ * 引擎通过 DOM 元素与界面交互：在按钮上绑定点击、读取 `header_el` 获取章节颜色、
+ * 用 GSAP 播放帮助提示。组件把节点登记在这里，`ChapterUi` 门面就能暴露同名成员，
+ * 同时由 React 持有标记。
  */
 
+/** 帮助提示用到的节点集合。 */
 export interface HelpNodes {
   container: HTMLElement
   tooltips: HTMLElement[]
@@ -17,6 +16,7 @@ export interface HelpNodes {
   clickPath: Element | null
 }
 
+/** 界面各区域的 DOM 节点集合。 */
 export interface UiNodes {
   header: HTMLElement | null
   loader: HTMLElement | null

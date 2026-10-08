@@ -1,10 +1,8 @@
 import { atlasInstance, getImages, modelItems } from '../legacyScope'
 
-/**
- * Ported from `js/atlas/utils.js` (Mersenne Twister PRNG plus the LOD helpers
- * that the original file also declared).
- */
+/** Mersenne Twister 伪随机数生成器及若干调试辅助函数。 */
 
+/** Mersenne Twister 伪随机数生成器接口。 */
 export interface Prng {
   MT: Uint32Array
   index: number
@@ -18,7 +16,7 @@ function createPrng(): Prng {
   const prng = { index: 0 } as Prng
 
   function setSeed(seed: number): void {
-    // Create a length 624 array to store the state of the generator
+    // 创建长度为 624 的数组来保存生成器状态
     prng.MT = new Uint32Array(624)
     prng.index = 0
     prng.MT[0] = seed
@@ -67,9 +65,10 @@ function createPrng(): Prng {
   return prng
 }
 
+/** 全局共享的 PRNG 实例。 */
 export const PRNG: Prng = createPrng()
 
-/** Requests the image urls of items that do not carry one yet. */
+/** 请求那些还没有 image_url 的条目的图片地址。 */
 export function getUrlsDict(
   results: string[],
   callback: (urls: Record<string, string>) => void,
@@ -88,12 +87,12 @@ export function getUrlsDict(
   if (!assetsWithoutUrls.length) {
     callback({})
   } else {
-    // make a request for missing urls
+    // 请求缺失的图片地址
     getImages()(assetsWithoutUrls.join(','), fromAllChannels, assetsWithoutUrls, callback)
   }
 }
 
-/** Debug helper: resets every asset of the atlas to white. */
+/** 调试用：把图集中的所有资产重置为白色。 */
 export function resetHighlight(): void {
   const assets = atlasInstance().assets
 
@@ -102,7 +101,7 @@ export function resetHighlight(): void {
   }
 }
 
-/** Debug helper: colours the assets matching the given ids. */
+/** 调试用：给匹配指定 id 的资产着色。 */
 export function highlight(results: string[], color: { r: number; g: number; b: number }): void {
   const atlas = atlasInstance()
 

@@ -1,13 +1,8 @@
 /**
- * Worker side HTTP helper.
+ * worker 侧 HTTP 辅助函数。
  *
- * The original worker scripts (`js/works/*.js`) called `Twix.ajax` from inside
- * the worker, which cannot reach the page globals: `createLegacyWorker` used to
- * bootstrap a blob worker that defined this helper and then `importScripts` the
- * real script. The ported workers are real modules and import it directly.
- *
- * It is XMLHttpRequest based on purpose (like the blob bootstrap): the original
- * worker code only used `success` / `error` callbacks and `abort()`.
+ * 故意使用 XMLHttpRequest：worker 中的调用方只用到 `success` / `error` 回调和
+ * `abort()`。
  */
 
 export interface TwixRequestOptions {
@@ -22,6 +17,7 @@ export interface TwixRequest {
   abort(): void
 }
 
+/** 发起 XHR 请求，返回可 abort 的句柄。 */
 export function twixAjax(options: TwixRequestOptions): TwixRequest {
   const xhr = new XMLHttpRequest()
 
@@ -46,6 +42,7 @@ export function twixAjax(options: TwixRequestOptions): TwixRequest {
   }
 }
 
+/** 以 POST 方式发起请求。 */
 export function twixPost(
   url: string,
   data: string,

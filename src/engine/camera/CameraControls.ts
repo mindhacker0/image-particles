@@ -19,157 +19,94 @@ import { timelineControls } from './controls/TimelineControls'
 import { tsneControls } from './controls/TsneControls'
 
 /**
- * Ported from `js/camera/cameraControls.js`.
- *
- * The camera driver of the whole experiment: it owns the `OrbitControls` /
- * `TrackballControls` pair, the shared `target` object, the state machine
- * (visualizers / timeline / curator / machine learning modes), the Hammer and
- * wheel listeners, the deep-link url (de)serialisation and the camera / target
- * tweens driven by gsap.
- *
- * The original was a classic script: an IIFE returning its own `exports`
- * object, prefixed by a few module globals (`PI`, `PI2`, `RAD`, `DEG`, `hasNan`,
- * `cc`) and the `lerp` / `norm` / `map` helpers other files also used. The port
- * keeps every member, argument order, constant, timing, easing, event name and
- * state-machine number.
- *
- * Port notes:
- * - `lerp` / `norm` / `map` were declared here (byte-identical bodies to the
- *   shared copies). They now live in `../utils/math`; this file only still uses
- *   `lerp`. The other module constants (`PI`, `PI2`, `RAD`, `DEG`, `hasNan`, `cc`)
- *   are exported for the other camera modules.
- * - the tweens use `gsap` directly; the legacy ease objects (`Expo.easeOut`,
- *   `Cubic.easeInOut`, ...) became GSAP 3 ease strings (`'expo.out'`, ...).
- * - `OrbitControls`, `TrackballControls` and `Hammer` are imported from their
- *   npm packages, like the geometry / material / vector classes.
- * - `renderNeeded = true` is written through `markRenderNeeded()`.
- * - The `camera` global is read through `camera()`; the long functions bind it
- *   to a local `cam` (the original re-read the global on every statement).
- * - The state owned by other modules (`renderer`, `params`,
- *   `displayIntroItem`, `disableCameraControls`, `lockLOD`,
- *   `mouseWheelDeltaFactor*`, `disableUI` / `enableUI`, the `atlas` instance)
- *   is read at call time through the small typed helpers below.
- * - `hammer.off('doubletap', onDoubleTap, false)` references a handler that no
- *   file defines: see the ambient declaration below.
- * - The private `hammer` variable became `hammerInstance` (every public member
- *   keeps its name).
- *
- * Fixed while porting (each one documented at its call site):
- * - `update()`'s fail-safe restored the camera with `camera.copy(lastCamera)`
- *   and the target with `camera.copy(lastTarget)`: `Object3D#copy` takes an
- *   `Object3D` (a `Vector3` makes it read `source.up`), and the second call
- *   clearly meant to restore the *target*. Both copy into `.position` now.
- *
- * Kept 1:1 (already broken in the original, reported instead of "fixed"):
- * - `initFromUrl()`'s `duration = duration == null || 0` produces `true` (no
- *   duration passed) or `0` (any other value, positive durations included).
- * - `checkTarPosDistance()` is dead code (its only call is commented out) and
- *   still logs to the console.
- * - `removeListeners()` throws on the undefined `onDoubleTap`; the `try` around
- *   it swallows that, so `pan` / `panend` / `press` / `touchstart` are never
- *   unbound (repeated `addListeners()` would stack Hammer handlers).
- * - `exports.onComplete` / `exports.onControlsChange` are never assigned by any
- *   file of this snapshot (only nulled by `dispose()`), so the "settled" branch
- *   of `update()` is dead and `events.dispatch('update')` always runs.
+ * 整个实验的相机控制器。
+ * 负责 OrbitControls / TrackballControls、状态切换、鼠标/手势事件和相机导航。
  */
 
-/**
- * Module constants of `js/camera/cameraControls.js`. The ported controls
- * (`DefaultControls`, `TsneControls`) keep private copies of `PI` / `RAD` to
- * avoid depending on this file's load order.
- */
+/** 相机控制模块的公共常量。 */
 export const PI = Math.PI
 export const PI2 = Math.PI * 2
 export const RAD = Math.PI / 180
 export const DEG = 180 / Math.PI
 
-/** `hasNan(v)` of `js/camera/cameraControls.js`. */
+/** 判断三维向量是否包含 NaN。 */
 export function hasNan(v: { x: number; y: number; z: number }): boolean {
   return isNaN(v.x) || isNaN(v.y) || isNaN(v.z)
 }
 
 /* ------------------------------------------------------------------------- *
- * Legacy globals still owned by the classic scripts.
- * They are read at call time: they do not exist yet while this module is
- * evaluated / imported.
+ * 主模块共享状态。
+ * 它们在模块初始化时尚未就绪，只能在调用时惰性读取。
  * ------------------------------------------------------------------------- */
 
-/** `renderer` (`Main.initTHREE`). */
+/** 渲染器实例。 */
 function renderer(): { domElement: ControlDomElement } {
   return mainRenderer as unknown as { domElement: ControlDomElement }
 }
 
-/**
- * Wheel-event feature detection of the original
- * (`window.onwheel !== undefined` / `window.onmousewheel !== undefined`):
- * `onmousewheel` is the old IE name, it is not part of the DOM typings.
- */
+/** 检测浏览器支持的滚轮事件类型（wheel / mousewheel）。 */
 function windowWheelHandlers(): { onwheel?: unknown; onmousewheel?: unknown } {
   return window as unknown as { onwheel?: unknown; onmousewheel?: unknown }
 }
 
-/** `lockLOD`, locked while the user drags / wheels. */
+/** 拖拽或滚轮期间锁定 LOD 更新。 */
 function lockLOD(): boolean {
   return shared.lockLOD
 }
 
-/** `lockLOD`, written by the pointer handlers and by `update()`. */
+/** 设置 LOD 锁定状态。 */
 function setLockLOD(value: boolean): void {
   shared.lockLOD = value
 }
 
-/** `disableCameraControls`, set by `disableUI` / `enableUI`. */
+/** 获取相机控制器是否禁用。 */
 function disableCameraControls(): boolean {
   return shared.disableCameraControls
 }
 
-/** `displayIntroItem`, true while the freefall intro is shown. */
+/** 介绍动画显示期间的状态。 */
 function displayIntroItem(): boolean {
   return shared.displayIntroItem
 }
 
-/** `disableUI` (`Main`): loading overlay + camera lock. */
+/** 调用主模块的禁用 UI。 */
 function disableUI(): void {
   mainDisableUI()
 }
 
-/** `enableUI` (`Main`): hides the loading overlay, releases the camera. */
+/** 调用主模块的启用 UI。 */
 function enableUI(): void {
   mainEnableUI()
 }
 
-/** `mouseWheelDeltaFactor`, assigned by `setState`. */
+/** 设置滚轮灵敏度。 */
 function setMouseWheelDeltaFactor(value: number): void {
   shared.mouseWheelDeltaFactor = value
 }
 
-/** `mouseWheelDeltaFactor_default`. */
+/** 默认滚轮系数。 */
 function mouseWheelDeltaFactorDefault(): number {
   return shared.mouseWheelDeltaFactor_default
 }
 
-/** `mouseWheelDeltaFactor_freefall`. */
+/** freefall 场景的滚轮系数。 */
 function mouseWheelDeltaFactorFreefall(): number {
   return shared.mouseWheelDeltaFactor_freefall
 }
 
 /**
- * `hammer.off('doubletap', onDoubleTap, false)` (see `removeListeners`) refers to
- * a handler that no file of this snapshot defines. The call sits inside a
- * `try {} catch {}`, so the `ReferenceError` it raises is swallowed exactly like
- * in the classic script. The declaration is ambient (no emitted code) so the
- * port keeps that behaviour instead of silently unbinding another handler.
+ * `removeListeners` 中 `hammer.off('doubletap', onDoubleTap)` 引用的处理函数未定义，
+ * 该调用位于 try/catch 内，其 ReferenceError 会被吞掉；此环境声明保证行为不变。
  */
 declare const onDoubleTap: (event: CameraControlEvent) => void
 
 /* ------------------------------------------------------------------------- *
- * Types of the legacy API surface.
+ * 本模块使用的内部类型定义。
  * ------------------------------------------------------------------------- */
 
 /**
- * `renderer.domElement` (`js/main.js`) as this module uses it: the listener
- * calls hand Hammer / wheel / mouse events to the same handlers, which the DOM
- * typings reject for every overload.
+ * `renderer.domElement` 的最小接口：需要承载 Hammer / 滚轮 / 鼠标事件，
+ * 这些事件在标准 DOM 类型中无法通过重载检查。
  */
 interface ControlDomElement {
   addEventListener(
@@ -185,8 +122,7 @@ interface ControlDomElement {
 }
 
 /**
- * Events handed to the controls and to this module's handlers: the raw wheel
- * event or a Hammer event with a `center` (see `js/camera/cameraControls.js`).
+ * 传给控制器与本模块处理函数的事件：原始滚轮事件，或带 `center` 的 Hammer 事件。
  */
 type CameraControlEvent = LegacyWheelEvent & {
   type: string
@@ -194,7 +130,7 @@ type CameraControlEvent = LegacyWheelEvent & {
   center: { x: number; y: number }
 }
 
-/** `Hammer` as this module drives it (the `@types/hammerjs` façade is narrower). */
+/** 本模块使用的 Hammer 接口（@types/hammerjs 的类型更窄）。 */
 interface HammerInstance {
   on(event: string, handler: (event: CameraControlEvent) => void, useCapture: boolean): void
   off(event: string, handler: (event: CameraControlEvent) => void, useCapture: boolean): void
@@ -202,19 +138,18 @@ interface HammerInstance {
 }
 
 /**
- * three's `OrbitControls` as the legacy code uses it.
+ * three 的 `OrbitControls` 接口。
  *
- * NOTE: the npm `OrbitControls` (r150+) expects `{ LEFT, MIDDLE, RIGHT }` in
- * `mouseButtons` and no longer reads `ORBIT` / `ZOOM` / `PAN`, and `enableKeys`
- * was removed in r147: this file assigns them anyway (1:1 with the original,
- * the whole camera layer needs the same fix).
+ * 注意：npm 版 `OrbitControls`（r150+）的 `mouseButtons` 使用
+ * `{ LEFT, MIDDLE, RIGHT }`，不再读取 `ORBIT` / `ZOOM` / `PAN`；
+ * `enableKeys` 也已在 r147 移除，下面的赋值不会生效。
  */
 interface OrbitControls {
   enabled: boolean
   target: THREE.Vector3
   enableDamping: boolean
   dampingFactor: number
-  /** Removed in three r147 (assignment kept 1:1). */
+  /** 该属性自 three r147 起已移除。 */
   enableKeys: boolean
   enableZoom: boolean
   rotateSpeed: number
@@ -230,7 +165,7 @@ interface OrbitControls {
   update(): boolean
 }
 
-/** three's `TrackballControls` as the legacy code uses it. */
+/** three 的 `TrackballControls` 接口。 */
 interface TrackballControls {
   enabled: boolean
   target: THREE.Vector3
@@ -243,24 +178,23 @@ interface TrackballControls {
 }
 
 /**
- * The camera of `js/main.js`.
+ * 相机对象。
  *
- * `legacyCamera()` only describes the members the ported atlas uses, while this
- * module also needs `up`, `lookAt` and `copy`: the cast widens it back to the
- * full three camera.
+ * `legacyCamera()` 只描述 atlas 用到的成员，这里还需要 `up`、`lookAt` 与 `copy`，
+ * 因此将其还原为完整的 three 相机。
  */
 function camera(): THREE.Camera {
   return legacyCamera() as unknown as THREE.Camera
 }
 
-/** One asset of the atlas, as this module reads it. */
+/** 本模块读取的 atlas 单个素材。 */
 interface CameraControlsAsset {
   position: THREE.Vector3
   sizeNorm: { w: number; h: number }
   coords: { w: number; h: number }
 }
 
-/** One mesh of `atlas.meshes` with the wave uniform animated by `setState`. */
+/** `atlas.meshes` 中的单个网格，含 `setState` 动画使用的波浪 uniform。 */
 interface CameraControlsMesh {
   material: {
     material: {
@@ -270,8 +204,7 @@ interface CameraControlsMesh {
 }
 
 /**
- * The `atlas` instance (`js/main.js` builds it) with the members this module
- * uses; `atlasInstance()` of `legacyScope` only covers the shared ones.
+ * 本模块使用的 atlas 实例；`atlasInstance()` 只覆盖共享成员。
  */
 interface CameraControlsAtlas {
   meshes: CameraControlsMesh[]
@@ -284,7 +217,7 @@ function atlasApi(): CameraControlsAtlas {
   return atlasInstance() as unknown as CameraControlsAtlas
 }
 
-/** One entry of `boundingBoxes` (built by the timeline app). */
+/** `boundingBoxes` 中的一项（由 timeline 应用构建）。 */
 interface TimelineBoundingBox {
   x: number
   y: number
@@ -293,17 +226,13 @@ interface TimelineBoundingBox {
 }
 
 /**
- * The controller currently driving the camera (`defaultControls`,
- * `timelineControls` or `tsneControls`). Only the members `cameraControls`
- * calls are described, so the three can be swapped in `setState`.
+ * 当前驱动相机的控制器（`defaultControls`、`timelineControls` 或 `tsneControls`）。
+ * 只描述 `cameraControls` 调用到的成员，以便在 `setState` 中互换。
  */
 interface CameraController {
   setState(newState: number): void
   onShift(newState: boolean): void
-  /**
-   * `onWheel` passes `exports.tweening` as a second argument which all three
-   * controllers ignore (kept 1:1).
-   */
+  /** `onWheel` 会传入第二个参数 tweening，但三个控制器都会忽略它。 */
   mouseHandler(event: CameraControlEvent, tweening?: boolean): void
   update(tweening?: boolean): boolean | void
   constrain(): void
@@ -311,17 +240,17 @@ interface CameraController {
   onSelectedAssetReached?(): void
 }
 
-/** The `cameraControls` global that `js/apps/**` and `js/main.js` drive. */
+/** 对外暴露的 cameraControls 对象。 */
 interface CameraControls {
   time: number
 
-  //timeline bounding box
+  // 时间线包围盒相关字段
   timelineHeight: number
   timelineWidth: number
-  /** Set by `js/apps/app_freefall.js` (null until then). */
+  /** 由 freefall 应用设置（设置前为 null）。 */
   timelineScroll: unknown
   boundingBoxes: TimelineBoundingBox[] | null
-  /** Legacy placeholder, never written (kept 1:1). */
+  /** 占位字段，从未被写入。 */
   box: unknown
 
   maxSelectedAssetDistance: number
@@ -339,16 +268,16 @@ interface CameraControls {
   MACHINE_TSNE: number
   MACHINE_AUTO: number
   tweening: boolean
-  /** Assigned by `setState` only. */
+  /** 仅由 `setState` 赋值。 */
   state: number
 
   orbitControls: OrbitControls
   trackball: TrackballControls
   target: THREE.Object3D
 
-  /** Never assigned by any file of this snapshot (see the header notes). */
+  /** 从未被赋值。 */
   onControlsChange: ((...args: unknown[]) => void) | null
-  /** Never assigned by any file of this snapshot (see the header notes). */
+  /** 从未被赋值。 */
   onComplete: ((forceUpdate?: boolean) => void) | null
 
   init(): void
@@ -394,8 +323,6 @@ export const cameraControls: CameraControls = (function (exports: CameraControls
   let events: EventDispatcher
   let target: THREE.Object3D
 
-  // Created (and never used) by the original: only the commented-out block in
-  // `init()` referenced them.
   const sphere0 = new THREE.Mesh(
     new THREE.IcosahedronGeometry(5, 1),
     new THREE.MeshBasicMaterial({ color: 0xff0000 }),
@@ -417,8 +344,8 @@ export const cameraControls: CameraControls = (function (exports: CameraControls
 
   exports.time = 0
 
-  //timeline bounding box
-  exports.time = 0 // (the original assigns `time` twice in a row)
+  // 时间线包围盒相关字段
+  exports.time = 0 // 此处重复赋值为 0，无副作用
   exports.timelineHeight = 0
   exports.timelineWidth = 0
   exports.timelineScroll = null
@@ -451,7 +378,7 @@ export const cameraControls: CameraControls = (function (exports: CameraControls
 
   let trackball: TrackballControls
 
-  // timeout prevent successive calls with osx smoothed mousewheel
+  // 用超时防止 macOS 平滑滚轮触发连续调用
   let onCompleteTimeout: ReturnType<typeof setTimeout>
   let locked: boolean
   let isUpdating = false
@@ -460,21 +387,12 @@ export const cameraControls: CameraControls = (function (exports: CameraControls
   let needsUpdate = false
 
   let selectedAsset: CameraControlsAsset | null
-  // Declared but never read by the original either: kept for the 1:1 port.
   let normalCameraDistance = 1
 
   let hammerInstance: HammerInstance | null = null
 
+  /** 初始化 OrbitControls / TrackballControls、控制器与手势监听。 */
   exports.init = function () {
-    // exports.sp0 = sphere0;
-    // sphere0.scale.multiplyScalar( 2.0 );
-    // sphere1 = new THREE.AxisHelper( 500 );
-    // exports.sp1 = sphere1;
-    // exports.sp2 = sphere2;
-    // scene.add( sphere0 );
-    // scene.add( sphere1 );
-    // scene.add( sphere2 );
-
     const cam = camera()
     cam.position.x = 0
     cam.position.y = 1000000
@@ -504,10 +422,10 @@ export const cameraControls: CameraControls = (function (exports: CameraControls
     tsneControls.init()
     controls = defaultControls
 
-    //max distance before "releasing" a selected asset
+    // 释放已选中素材的最大距离
     exports.maxSelectedAssetDistance = lod.maxRange
 
-    //event dispatcher
+    // 事件分发器
     events = new EventDispatcher()
     hammerInstance = new Hammer(
       renderer().domElement as unknown as HTMLElement,
@@ -517,13 +435,14 @@ export const cameraControls: CameraControls = (function (exports: CameraControls
     exports.addListeners()
   }
 
+  /** 同步 Shift 键状态到当前控制器。 */
   exports.onShift = function (newState: boolean) {
     shiftDown = newState
     controls.onShift(newState)
   }
 
   function resetOrbitControls() {
-    //reset orbit controls
+    // 重置 OrbitControls
     orbitControls.rotateSpeed = 0.1
     orbitControls.panSpeed = 0.05
     orbitControls.zoomSpeed = 0.5
@@ -545,15 +464,16 @@ export const cameraControls: CameraControls = (function (exports: CameraControls
     trackball.maxDistance = 30000
   }
 
+  /** 切换到目标状态：重置控制器、选择对应实现并播放过渡。 */
   exports.setState = function (newState: number) {
     setMouseWheelDeltaFactor(
       newState == exports.VISUALIZER_RANDOM
         ? mouseWheelDeltaFactorFreefall()
         : mouseWheelDeltaFactorDefault(),
     )
-    // for t-sne map see the tsneControls update ----
+    // t-SNE 场景的滚轮系数见 tsneControls.update
 
-    //flush variables
+    // 清空状态
     exports.tweening = false
     selectedAsset = null
     controls.selectAsset(null)
@@ -561,16 +481,16 @@ export const cameraControls: CameraControls = (function (exports: CameraControls
     gsap.killTweensOf(orbitControls)
     atlasApi().setFogDistance(50000)
 
-    //reset controls
+    // 重置控制器
     resetOrbitControls()
 
-    //reset trackball
+    // 重置 TrackballControls
     resetTrackball()
 
-    //sets the new state
+    // 设置新状态
     exports.state = state = newState
 
-    //assign the proper controller depending on the type of distribution
+    // 按分布类型选择对应的控制器
     switch (state) {
       default:
       case exports.VISUALIZER_RANDOM:
@@ -600,10 +520,10 @@ export const cameraControls: CameraControls = (function (exports: CameraControls
 
     camera().up.set(0, 1, 0)
 
-    //reset the current controller
+    // 初始化当前控制器
     controls.setState(state)
 
-    //removes the wave animation
+    // 移除波浪动画
     for (const mesh of atlasApi().meshes) {
       gsap.to(mesh.material.material.uniforms.wavesAmp, {
         duration: 2,
@@ -618,7 +538,7 @@ export const cameraControls: CameraControls = (function (exports: CameraControls
       exports.targetGoto(ZERO, 1)
     }
 
-    //shift controls
+    // 同步 shift 状态
     exports.onShift(false)
   }
 
@@ -628,24 +548,22 @@ export const cameraControls: CameraControls = (function (exports: CameraControls
     exports.removeListeners()
   }
 
+  /** 解绑手势、滚轮与鼠标离开监听。 */
   exports.removeListeners = function () {
     const dom = renderer().domElement
     try {
-      // hammer.off('press', onDown, false);
       hammerInstance.off('panstart', onDown, false)
       hammerInstance.off('release', onUp, false)
       hammerInstance.off('tap', onUp, false)
-      // `onDoubleTap` is undefined in every file of this snapshot: this throws
-      // (caught below), which is why the `pan` / `panend` handlers after it are
-      // never unbound. Kept 1:1.
+      // onDoubleTap 未定义，这里会抛错并被下方 catch 吞掉，
+      // 因此其后的 pan / panend 处理器永远不会被解绑。
       hammerInstance.off('doubletap', onDoubleTap, false)
       hammerInstance.off('pan', onMove, false)
       hammerInstance.off('panend', onUp, false)
     } catch (e) {
-      // (empty in the original as well)
+      // 忽略未定义处理器导致的异常
     }
 
-    // dom.removeEventListener('mousewheel',       onDown, false);
     if (windowWheelHandlers().onwheel !== undefined) {
       dom.removeEventListener('wheel', onDown, false)
     } else if (windowWheelHandlers().onmousewheel !== undefined) {
@@ -654,6 +572,7 @@ export const cameraControls: CameraControls = (function (exports: CameraControls
     dom.removeEventListener('mouseleave', onUp, false)
   }
 
+  /** 绑定手势、滚轮与鼠标离开监听。 */
   exports.addListeners = function () {
     exports.removeListeners()
 
@@ -675,6 +594,7 @@ export const cameraControls: CameraControls = (function (exports: CameraControls
     dom.addEventListener('mouseleave', onUp, false)
   }
 
+  /** 按下：记录 LOD 锁定状态并交由当前控制器处理。 */
   function onDown(e: CameraControlEvent) {
     if (exports.tweening) return
     locked = lockLOD()
@@ -682,6 +602,7 @@ export const cameraControls: CameraControls = (function (exports: CameraControls
     controls.mouseHandler(e)
   }
 
+  /** 滚轮：处理缩放并立即触发一次更新。 */
   function onWheel(e: CameraControlEvent) {
     e.preventDefault()
 
@@ -695,10 +616,10 @@ export const cameraControls: CameraControls = (function (exports: CameraControls
 
     if (state == exports.CURATOR_IDLE) {
       exports.update(true)
-      // console.log( "scroll" );
     }
   }
 
+  /** 拖拽移动：交由当前控制器处理并锁定 LOD。 */
   function onMove(e: CameraControlEvent) {
     if (exports.tweening) return
     setLockLOD(true)
@@ -706,6 +627,7 @@ export const cameraControls: CameraControls = (function (exports: CameraControls
     controls.mouseHandler(e)
   }
 
+  /** 松开：恢复按下前的 LOD 锁定状态。 */
   function onUp(e: CameraControlEvent) {
     if (exports.tweening) return
     needsUpdate = false
@@ -713,38 +635,32 @@ export const cameraControls: CameraControls = (function (exports: CameraControls
     setLockLOD(locked)
   }
 
-  // Declared (and never read) by the original, kept for the 1:1 port.
   const ready = true
 
+  /** 每帧更新控制器、相机位置与 LOD 状态。 */
   function update(forceUpdate?: boolean) {
     const cam = camera()
 
-    //stores the position to compute the minimum delta
-    //and eventually call a LOD refresh
+    // 记录当前位置，用于计算最小位移
+    // 并在必要时触发 LOD 刷新
     lastCamera.copy(cam.position)
     lastTarget.copy(target.position)
 
-    //calls the controls update
+    // 同步 controls 的目标点
     orbitControls.target = target.position
     trackball.target = target.position
     cam.lookAt(target.position)
 
-    //calls an update on the controller
+    // 调用当前控制器的更新（可能不返回值，这里按真值判断）
     isUpdating = false
     if (!exports.tweening && !disableCameraControls())
-      // `update()` may return nothing at all: the original stored the raw value
-      // and tested it for truthiness.
       isUpdating = Boolean(controls.update(exports.tweening))
 
-    //fail safe
-    // FIX: the original wrote `camera.copy( lastCamera )` and
-    // `camera.copy( lastTarget )`; `Object3D#copy` expects an `Object3D` (it
-    // reads `source.up` and would throw on a `Vector3`) and the second call
-    // clearly meant to restore the *target*: both copy into `.position` now.
+    // 兜底：位置出现 NaN 时用上一帧的备份恢复
     if (hasNan(cam.position)) cam.position.copy(lastCamera)
     if (hasNan(target.position)) target.position.copy(lastTarget)
 
-    //check if a render and/or a LOD update are necessary
+    // 判断是否需要渲染或刷新 LOD
     if (exports.tweening || needsUpdate || isUpdating || Boolean(forceUpdate)) {
       markRenderNeeded()
 
@@ -764,7 +680,7 @@ export const cameraControls: CameraControls = (function (exports: CameraControls
       }
     }
 
-    //releases the selected asset if far enough
+    // 距离足够远时释放已选中的素材
     if (!exports.tweening && selectedAsset) {
       if (
         (state == exports.MACHINE_TSNE || state == exports.MACHINE_AUTO) &&
@@ -772,11 +688,8 @@ export const cameraControls: CameraControls = (function (exports: CameraControls
       ) {
         selectedAsset = null
         controls.selectAsset(null)
-        // console.log('release asset');
       }
     }
-
-    // console.log(exports.info() )
   }
 
   exports.update = update
@@ -793,13 +706,14 @@ export const cameraControls: CameraControls = (function (exports: CameraControls
     return Math.abs(v.x) < threshold && Math.abs(v.y) < threshold && Math.abs(v.z) < threshold
   }
 
+  /** 将相机与目标位置写入 URL hash。 */
   function toUrl() {
     if (legacyParams().isBigWallVersion) return
 
     const cam = camera()
     if (hasNan(cam.position) || hasNan(target.position)) return
 
-    //prevents deeplink to be created on the freefall intro
+    // freefall 引导页不生成深链接
     if (legacyParams().directChapter == 'freefall') {
       const href = getCurrentUrl()
       const bits = href.split('/')
@@ -820,12 +734,13 @@ export const cameraControls: CameraControls = (function (exports: CameraControls
       url += target.position.y.toFixed(precision) + urlSep
       url += target.position.z.toFixed(precision)
     } else {
-      url = url.substr(0, url.length - 1) //pops the last comma
+      url = url.substr(0, url.length - 1) // 去掉末尾多余的逗号
     }
     window.location.hash = url
   }
   exports.toUrl = toUrl
 
+  /** 从 URL 片段恢复相机 / 目标位置。 */
   exports.initFromUrl = function (url: string, duration?: number) {
     const camTarget = exports.getPositionsFromURL(url)
     if (camTarget == null) {
@@ -835,16 +750,13 @@ export const cameraControls: CameraControls = (function (exports: CameraControls
       return
     }
 
-    // The original wrote `duration = duration == null || 0`, which evaluates to
-    // `true` when no duration is passed and to `0` otherwise (a positive
-    // duration is discarded too). Kept 1:1; the cast only adapts the type.
+    // 注意：`duration == null || 0` 的结果只会是 true 或 0，
+    // 传入的时长会被丢弃（类型转换仅为通过检查）。
     duration = (duration == null || 0) as unknown as number
 
     const onComplete = function () {
       exports.forceLod()
     }
-
-    // console.log(camTarget.length);
 
     if (camTarget.length == 1) {
       exports.cameraGoto(camTarget[0], duration, onComplete)
@@ -855,13 +767,12 @@ export const cameraControls: CameraControls = (function (exports: CameraControls
       exports.targetGoto(camTarget[1], duration)
     }
 
-    // console.log( camTarget );
     setTimeout(exports.forceLod, (duration + 1) * 1000)
   }
 
+  /** 解析 URL 片段中的相机 / 目标坐标。 */
   exports.getPositionsFromURL = function (url: string): THREE.Vector3[] | null {
-    //"security" check
-    //the url arguments should contain only numbers, period and comas
+    // 安全校验：URL 参数只能包含数字、小数点和逗号
     let out: THREE.Vector3[] | null = null
 
     const data = url.split(urlSep)
@@ -885,8 +796,6 @@ export const cameraControls: CameraControls = (function (exports: CameraControls
       ]
     }
 
-    // console.log( data );
-
     return out
   }
 
@@ -894,6 +803,7 @@ export const cameraControls: CameraControls = (function (exports: CameraControls
     lod.setFromCamera()
   }
 
+  /** 相机位置补间到指定坐标。 */
   exports.cameraGoto = function (
     pos?: THREE.Vector3 | null,
     duration?: number,
@@ -901,8 +811,6 @@ export const cameraControls: CameraControls = (function (exports: CameraControls
     onUpdate?: (() => void) | null,
     ease?: unknown,
   ) {
-    //gsap.killTweensOf(camera.position);
-
     exports.lockUI()
     pos = pos || ZERO
     exports.tweening = true
@@ -918,20 +826,16 @@ export const cameraControls: CameraControls = (function (exports: CameraControls
       onUpdate: function () {
         if (onUpdate) onUpdate()
         controls.constrain()
-        // console.log( camera.position.x, camera.position.y, camera.position.z );
       },
       onComplete: function () {
         exports.tweening = false
-        // console.log( "cam tween over", camera.position.x, camera.position.y, camera.position.z );
-        // setTimeout( function(){
-        //     console.log( "\t > cam tween over", camera.position.x, camera.position.y, camera.position.z );
-        // }, 1000 );
         if (cb) cb()
         exports.unlockUI()
       },
     })
   }
 
+  /** 目标点补间到指定坐标。 */
   exports.targetGoto = function (
     pos?: THREE.Vector3 | null,
     duration?: number,
@@ -953,23 +857,20 @@ export const cameraControls: CameraControls = (function (exports: CameraControls
       onUpdate: function () {
         if (onUpdate) onUpdate()
         controls.constrain()
-        // console.log( target.position.x, target.position.y, target.position.z );
       },
       onComplete: function () {
         exports.tweening = false
-        // console.log( "target tween over", target.position.x, target.position.y, target.position.z );
         if (cb) cb()
         exports.unlockUI()
       },
     })
   }
 
+  /** 判断素材是否与当前选中项一致。 */
   exports.isSelectedAsset = function (asset: unknown) {
     return asset == selectedAsset
   }
 
-  // Dead code in the original: its only call site (`gotoAsset`) is commented
-  // out. Kept 1:1, console logging included.
   function checkTarPosDistance(
     asset: CameraControlsAsset,
     pos: THREE.Vector3,
@@ -1013,6 +914,7 @@ export const cameraControls: CameraControls = (function (exports: CameraControls
     return pos
   }
 
+  /** 将相机与目标平滑移动到指定素材。 */
   exports.gotoAsset = function (
     asset: CameraControlsAsset | string | null,
     duration?: number,
@@ -1027,27 +929,21 @@ export const cameraControls: CameraControls = (function (exports: CameraControls
     }
 
     if (typeof asset === 'string') {
-      // NOTE: an id the atlas does not know resolves to `null`, which the
-      // original did not check either (`asset.position` below would throw).
-      // Kept 1:1.
+      // 注意：未识别的 id 会解析为 null，后续读取 asset.position 会报错。
       asset = atlasApi().getAsset(asset)
     }
 
-    // console.log( asset.id );
-
     if (displayIntroItem()) return
-    // if (selectedAsset == asset) return;
 
     exports.lockUI()
     selectedAsset = asset
     controls.selectAsset(asset)
-    // console.log( '\t select asset' );
 
     let pos: THREE.Vector3, tar: THREE.Vector3
     const cam = camera()
-    const camDist = orbitControls.minDistance //16 *3;//
+    const camDist = orbitControls.minDistance
     const delta = cam.position.clone().sub(asset.position).normalize().multiplyScalar(camDist)
-    const upVec = new THREE.Vector3(0, -1, 0) //.applyQuaternion( camera.quaternion ).multiplyScalar(-1);
+    const upVec = new THREE.Vector3(0, -1, 0)
 
     pos = asset.position.clone().add(delta).add(upVec)
     tar = asset.position.clone().add(upVec)
@@ -1056,7 +952,7 @@ export const cameraControls: CameraControls = (function (exports: CameraControls
       pos.x = tar.x
     }
 
-    //prevent perspective torsion when looking at the 3D timeline
+    // 避免查看 3D 时间线时出现透视扭转
     if (
       state == exports.TIMELINE_3D ||
       state == exports.TIMELINE_FLAT ||
@@ -1067,13 +963,7 @@ export const cameraControls: CameraControls = (function (exports: CameraControls
       pos = tar.clone().add(timelineControls.axis.normalize().multiplyScalar(orbitControls.minDistance))
     }
 
-    //prevent perspective torsion when looking at the flat timeline
-    // if (state == exports.TIMELINE_FLAT) {
-    //     pos.x = asset.position.x;
-    //     pos.y = asset.position.y;
-    // }
-
-    //locks the view axis towards the center in RANDOM mode
+    // RANDOM 模式下将视线轴锁定朝向中心
     if (state == exports.VISUALIZER_RANDOM) {
       tar = ZERO
       pos = asset.position
@@ -1083,7 +973,7 @@ export const cameraControls: CameraControls = (function (exports: CameraControls
       selectedAsset = null
       controls.selectAsset(null)
 
-      //special case for berekhat Ram
+      // Berekhat Ram 的特殊处理
       if (asset == atlasApi().getOldestAsset()) {
         pos = cam.position.clone().normalize().multiplyScalar(orbitControls.minDistance)
       }
@@ -1099,15 +989,8 @@ export const cameraControls: CameraControls = (function (exports: CameraControls
       pos.y = tsneControls.getYOffset(pos)
     }
 
-    //gsap.killTweensOf(target.position);
-    //gsap.killTweensOf(camera.position);
-    //gsap.killTweensOf(exports);
-
     cameraOrigin.copy(cam.position)
     targetOrigin.copy(target.position)
-
-    //make sure the asset fits in the view
-    // pos = checkTarPosDistance( asset, pos,tar );
 
     exports.tweening = true
     exports.time = 0
@@ -1133,8 +1016,6 @@ export const cameraControls: CameraControls = (function (exports: CameraControls
         cam.lookAt(target.position)
       },
       onComplete: function () {
-        // console.log( "to asset c:", camera.position.x, camera.position.y, camera.position.z );
-        // console.log( "to asset t:", target.position.x, target.position.y, target.position.z );
         exports.unlockUI()
 
         exports.tweening = false
@@ -1158,5 +1039,5 @@ export const cameraControls: CameraControls = (function (exports: CameraControls
   return exports
 })({} as CameraControls)
 
-/** `cc` (`js/camera/cameraControls.js`) is an alias of the same object. */
+/** `cc` 是同一对象的别名。 */
 export const cc = cameraControls

@@ -1,7 +1,6 @@
 /**
  *
- * The original exposed the members through a single `canvasUtils` global, which
- * `js/atlas/dateLabels.js` still reads as `canvasUtils.measureText(...)`.
+ * Canvas 相关辅助函数，统一由 `canvasUtils` 对象导出。
  */
 
 export interface LabelFont {
@@ -15,12 +14,13 @@ export interface TextMeasure {
   h: number
 }
 
-/** 2d context that also carries its own width / height, as the legacy code sets them. */
+/** 携带自身 width / height 的 2d 上下文。 */
 export type SizedContext = CanvasRenderingContext2D & { width: number; height: number }
 
 const canvas = document.createElement('canvas')
 const ctx = canvas.getContext('2d') as CanvasRenderingContext2D
 
+/** 用给定字体测量文本宽高（含 padding）。 */
 export function measureText(text: string, font: LabelFont, padding: number): TextMeasure {
   ctx.save()
   ctx.fillStyle = font.color
@@ -34,6 +34,7 @@ export function measureText(text: string, font: LabelFont, padding: number): Tex
   return { w: Math.ceil(w), h: Math.ceil(h) }
 }
 
+/** 创建指定尺寸的 canvas 元素。 */
 export function create(w: number, h: number): HTMLCanvasElement {
   const element = document.createElement('canvas')
   element.width = w
@@ -41,6 +42,7 @@ export function create(w: number, h: number): HTMLCanvasElement {
   return element
 }
 
+/** 获取 2d 上下文，并把 width / height 挂到上下文上。 */
 export function getContext(
   target?: HTMLCanvasElement,
   w?: number,
@@ -56,6 +58,7 @@ export function getContext(
   return context
 }
 
+/** 把图像绘制到等尺寸的新 canvas 上；图像为空返回 null。 */
 export function fromImage(image: CanvasImageSource & { width: number; height: number }): HTMLCanvasElement | null {
   if (!image) {
     console.warn('The image provide is null or undefined.')
@@ -74,6 +77,7 @@ export function fromImage(image: CanvasImageSource & { width: number; height: nu
   return element
 }
 
+/** 读取图像的 ImageData；图像为空返回 null。 */
 export function getImageData(
   image: CanvasImageSource & { width: number; height: number },
 ): ImageData | null {
@@ -86,6 +90,7 @@ export function getImageData(
   return (element.getContext('2d') as CanvasRenderingContext2D).getImageData(0, 0, image.width, image.height)
 }
 
+/** 按宽度把文本折成多行。 */
 export function chopMultilineText(
   context: CanvasRenderingContext2D,
   text: string,
@@ -101,7 +106,7 @@ export function chopMultilineText(
 
     if (context.measureText(tmp).width >= width) {
       if (line === '') {
-        // prevent long string without space that lead to an infinity loop
+        // 防止没有空格的长字符串导致死循环
         line = tmp.substr(0, tmp.length - 1)
         let j = line.length + 1
         while (j--) {
@@ -131,11 +136,11 @@ export function chopMultilineText(
 }
 
 /**
- * Creates a noise on the specified 2d context's canvas.
+ * 在指定的 2d 上下文画布上生成噪声。
  *
- * @param rgba color code specifying which channels are affected (default = 0)
- * @param min noise lower bound (>= 0)
- * @param max noise upper bound (<= 0xFF)
+ * @param rgba 指定受影响的通道（默认 0）
+ * @param min 噪声下界（>= 0）
+ * @param max 噪声上界（<= 0xFF）
  */
 export function noise(
   context: CanvasRenderingContext2D,
@@ -144,27 +149,27 @@ export function noise(
   max?: number,
 ): void {
   /*
-     RGBA mode. possible values
+     RGBA 模式，可能取值：
 
-     OPAQUE
-     0 : opaque greyscale ( white noise + black background )
-     1 : opaque red    ( red channel + black background )
-     2 : opaque green  ( green channel + black background )
-     3 : opaque red + green
-     4 : opaque blue   ( blue channel + black background )
-     5 : opaque red + blue
-     6 : opaque green + blue
-     7 : opaque red + green + blue
+     不透明
+     0 : 不透明灰度（白噪声 + 黑色背景）
+     1 : 不透明红   （红通道 + 黑色背景）
+     2 : 不透明绿   （绿通道 + 黑色背景）
+     3 : 不透明红 + 绿
+     4 : 不透明蓝   （蓝通道 + 黑色背景）
+     5 : 不透明红 + 蓝
+     6 : 不透明绿 + 蓝
+     7 : 不透明红 + 绿 + 蓝
 
-     TRANSPARENT
-     8 : transparent alpha    ( black + transparent background )
-     9 : transparent red      ( red channel + transparent background )
-     10 : transparent green    ( green channel + transparent background )
-     11 : transparent red + green
-     12 : transparent blue     ( blue channel + transparent background )
-     13 : transparent red + blue
-     14 : transparent green + blue
-     15 : transparent red + green + blue
+     透明
+     8 : 透明 alpha  （黑色 + 透明背景）
+     9 : 透明红      （红通道 + 透明背景）
+     10 : 透明绿     （绿通道 + 透明背景）
+     11 : 透明红 + 绿
+     12 : 透明蓝     （蓝通道 + 透明背景）
+     13 : 透明红 + 蓝
+     14 : 透明绿 + 蓝
+     15 : 透明红 + 绿 + 蓝
   */
   if (rgba == null) rgba = 0
 
@@ -213,17 +218,18 @@ export function noise(
   context.putImageData(img, 0, 0)
 }
 
+/** 把 canvas 转成 PNG 的 Blob。 */
 export function createImageBlob(canvasElement: HTMLCanvasElement): Blob {
   const extra = ''
   let dataURL = ''
   dataURL += canvasElement.toDataURL('image/png')
   dataURL += extra
 
-  // turn it into raw data
+  // 转成原始数据
   const data = atob(dataURL.substring('data:image/png;base64,'.length))
   const asArray = new Uint8Array(data.length + extra.length)
 
-  // turns it into a byte stream
+  // 转成字节流
   for (let i = 0, len = data.length; i < len; ++i) {
     asArray[i] = data.charCodeAt(i)
   }
@@ -231,10 +237,12 @@ export function createImageBlob(canvasElement: HTMLCanvasElement): Blob {
   return new Blob([asArray.buffer], { type: 'image/png' })
 }
 
+/** RGB 转 `0xrrggbb` 字符串。 */
 export function rgbToHex(r: number, g: number, b: number): string {
   return '0x' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)
 }
 
+/** 十六进制字符串转 RGB，格式不符返回 null。 */
 export function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
   return result
@@ -246,7 +254,7 @@ export function hexToRgb(hex: string): { r: number; g: number; b: number } | nul
     : null
 }
 
-/** Object shape published as the legacy `canvasUtils` global (same members as the original). */
+/** 聚合本模块所有函数的导出对象。 */
 export const canvasUtils = {
   measureText,
   create,

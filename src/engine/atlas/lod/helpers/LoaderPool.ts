@@ -3,7 +3,8 @@ import { ImageLoader } from './ImageLoader'
 import type { LODAssetLike } from '../types'
 
 /**
- * Keeps a fixed number of `ImageLoader`s busy with a queue of assets.
+ * 用固定数量的 `ImageLoader` 并发消费一个资产队列，
+ * 从而限制同时进行的请求数量。
  */
 export class LoaderPool {
   static readonly QUEUE_LOADED = 'queueLoaded'
@@ -44,20 +45,20 @@ export class LoaderPool {
   }
 
   loadNext(loader: ImageLoader): void {
-    // loads next item in queue
+    // 加载队列中的下一项
     const asset = this.queue.shift()
     if (asset) {
       loader.load(asset, this.LODDescriptor as never)
     }
 
-    // if all loaders have finished
+    // 若所有加载器都已空闲
     if (this.queue.length === 0) {
       let over = true
       this.loaders.forEach(function (current) {
         if (!current.idle) over = false
       })
 
-      // notify the LODItem that all is loaded
+      // 通知 LODItem 全部加载完成
       if (over) {
         this.events.dispatch(LoaderPool.QUEUE_LOADED)
       }
@@ -65,6 +66,7 @@ export class LoaderPool {
   }
 
   load(assets: LODAssetLike[]): void {
+    // 把有效资产加入队列，并让空闲的加载器立即开始工作
     const scope = this
 
     assets.forEach(function (asset) {

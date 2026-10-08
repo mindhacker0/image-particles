@@ -2,10 +2,9 @@ import { Vector3 } from 'three'
 import type { FormulaAsset } from '../legacyScope'
 
 /**
- * Distributes the assets with a golden-angle spiral (sunflower) layout.
+ * 用黄金角螺旋（向日葵）布局在球面上分布资产。
  *
- * `numSpirals` is kept because the original constructor accepted it, but the
- * spiral layout that replaced the older phi/theta code no longer reads it.
+ * `numSpirals` 仅为兼容构造签名保留，当前螺旋布局并不使用它。
  */
 export class SphereFormula {
   private readonly radius: number
@@ -19,7 +18,7 @@ export class SphereFormula {
   apply(assets: FormulaAsset[]): void {
     void this.numSpirals
 
-    // from: http://www.softimageblog.com/archives/115
+    // 算法来源：http://www.softimageblog.com/archives/115
     const n = assets.length
     const goldenRatio = Math.PI * (3 - Math.sqrt(5))
     const off = 2 / n
