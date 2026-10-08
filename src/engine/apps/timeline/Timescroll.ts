@@ -281,7 +281,7 @@ export const Timescroll = class Timescroll {
     var yearItems = year.items;
     var asset;
 
-    var pos = new THREE.Vector3((yearId + 1) * this.margin.z, -25, -5);
+    var pos = new Vector3((yearId + 1) * this.margin.z, -25, -5);
 
     var label;
     if (year.year < -9999) {

@@ -1,6 +1,9 @@
 import * as THREE from 'three'
+import { cameraControls as engineCameraControls } from '../CameraControls'
+import { shared } from '../../Main'
 import { legacyCamera } from '../../legacyScope'
 import { norm } from '../../utils/math'
+import Hammer from 'hammerjs'
 
 /**
  * Ported from `js/camera/controls/tsneControls.js`.
@@ -19,9 +22,7 @@ import { norm } from '../../utils/math'
  *   dependency on that file.
  * - `norm` used to be a global of that same file with the exact same body as
  *   `src/engine/utils/math.ts` -> imported from there.
- * - `Hammer` comes from `src/legacy/globals.ts` (npm `hammerjs`); the members
- *   used here (`inherit`, `MouseInput`, `Input`, `INPUT_*`) are missing from
- *   `@types/hammerjs`, hence the local interface.
+ * - `Hammer` is imported from the npm `hammerjs` package.
  * - `lastMouse` is a `Vector2` but the original called `set(x, y, 0)` (a
  *   Vector3 shaped call): three ignores the extra argument, so it is dropped.
  * - `raycaster.ray.intersectPlane(plane)` lost its one argument form in r125,
@@ -68,44 +69,24 @@ declare const ImageTsneFormula: { getHeightAt(x: number, y: number): number }
  */
 declare const tsneMesh: { mesh: THREE.Object3D }
 
-/** `lockLOD` (`js/main.js`), written by `update`. */
+/** `lockLOD`, written by `update`. */
 function setLockLOD(value: boolean): void {
-  ;(window as unknown as { lockLOD: boolean }).lockLOD = value
+  shared.lockLOD = value
 }
 
-/** `mouseWheelDeltaFactor_tsne_min` (`js/main.js`). */
+/** `mouseWheelDeltaFactor_tsne_min`. */
 function mouseWheelDeltaFactorTsneMin(): number {
-  return (window as unknown as { mouseWheelDeltaFactor_tsne_min: number })
-    .mouseWheelDeltaFactor_tsne_min
+  return shared.mouseWheelDeltaFactor_tsne_min
 }
 
-/** `mouseWheelDeltaFactor_tsne_max` (`js/main.js`). */
+/** `mouseWheelDeltaFactor_tsne_max`. */
 function mouseWheelDeltaFactorTsneMax(): number {
-  return (window as unknown as { mouseWheelDeltaFactor_tsne_max: number })
-    .mouseWheelDeltaFactor_tsne_max
+  return shared.mouseWheelDeltaFactor_tsne_max
 }
 
-/** `mouseWheelDeltaFactorOrbit` (`js/main.js`), written by `update`. */
+/** `mouseWheelDeltaFactorOrbit`, written by `update`. */
 function setMouseWheelDeltaFactorOrbit(value: number): void {
-  ;(window as unknown as { mouseWheelDeltaFactorOrbit: number }).mouseWheelDeltaFactorOrbit =
-    value
-}
-
-/**
- * `Hammer` (installed from npm by `src/legacy/globals.ts`) with the members the
- * original uses to patch the mouse input.
- */
-interface HammerStatic {
-  INPUT_START: number
-  INPUT_MOVE: number
-  INPUT_END: number
-  Input: unknown
-  MouseInput: unknown
-  inherit(child: unknown, base: unknown, properties: Record<string, unknown>): void
-}
-
-function hammer(): HammerStatic {
-  return (window as unknown as { Hammer: HammerStatic }).Hammer
+  shared.mouseWheelDeltaFactorOrbit = value
 }
 
 /** The `this` of the patched Hammer mouse input (see `Hammer.MouseInput`). */
@@ -154,7 +135,7 @@ interface TsneControlsContext {
 }
 
 function cameraControls(): TsneControlsContext {
-  return (window as unknown as { cameraControls: TsneControlsContext }).cameraControls
+  return engineCameraControls as unknown as TsneControlsContext
 }
 
 /**
@@ -237,15 +218,20 @@ export const tsneControls: TsneControls = (function (exports: TsneControls) {
     //extend to allow right click
 
     //input mouse map is not a public property of Hammer, so copy it here
-    const Hammer = hammer()
+   
     const MOUSE_INPUT_MAP: Record<string, number> = {
       mousedown: Hammer.INPUT_START,
       mousemove: Hammer.INPUT_MOVE,
       mouseup: Hammer.INPUT_END,
     }
     //override
-    Hammer.inherit(Hammer.MouseInput, Hammer.Input, {
-      handler: function MEhandler(this: HammerMouseInput, ev: HammerMouseEvent) {
+    // `@types/hammerjs` types `MouseInput` / `Input` as instances, while the
+    // runtime `inherit` expects the constructors they are at run time.
+    Hammer.inherit(
+      Hammer.MouseInput as unknown as Function,
+      Hammer.Input as unknown as Function,
+      {
+        handler: function MEhandler(this: HammerMouseInput, ev: HammerMouseEvent) {
         let eventType = MOUSE_INPUT_MAP[ev.type]
 
         //modified to handle all buttons

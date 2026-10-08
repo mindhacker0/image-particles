@@ -11,6 +11,7 @@ import {
 } from 'three'
 import { TweenLite } from '../../legacy/gsapLegacy'
 import { Model } from '../data/Models'
+import { shared } from '../Main'
 import { atlasInstance, legacyApp, legacyCamera, markRenderNeeded } from '../legacyScope'
 import { JSONLoader } from '../utils/JSONLoader'
 import { dateLabels } from './DateLabels'
@@ -507,14 +508,14 @@ export class Atlas {
  * evaluated / imported.
  * ------------------------------------------------------------------------- */
 
-/** `rendererWidth`, a legacy global owned by `js/main.js` (the render loop). */
+/** `rendererWidth` (set by `Main.initTHREE`). */
 function rendererWidth(): number {
-  return (window as unknown as { rendererWidth: number }).rendererWidth
+  return shared.rendererWidth
 }
 
-/** `rendererHeight`, a legacy global owned by `js/main.js` (the render loop). */
+/** `rendererHeight` (set by `Main.initTHREE`). */
 function rendererHeight(): number {
-  return (window as unknown as { rendererHeight: number }).rendererHeight
+  return shared.rendererHeight
 }
 
 /** The members of `app` (`js/apps/app_freefall.js`) this module reads. */

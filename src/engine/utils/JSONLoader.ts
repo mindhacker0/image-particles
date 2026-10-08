@@ -47,19 +47,3 @@ export class JSONLoader {
     }
   }
 }
-
-/**
- * The original script also created a shared `jsonLoader` instance on load.
- * Nothing reads that global any more, so it is created on first access instead
- * of spawning an idle worker for every page view.
- */
-export function installJsonLoaderGlobal(scope: Record<string, unknown>): void {
-  Object.defineProperty(scope, 'jsonLoader', {
-    configurable: true,
-    get() {
-      const instance = new JSONLoader()
-      Object.defineProperty(scope, 'jsonLoader', { value: instance, configurable: true })
-      return instance
-    },
-  })
-}

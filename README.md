@@ -45,9 +45,8 @@ src/
   main.tsx            React bootstrap (mounts App into #react-root)
   App.tsx             engine lifecycle + startup failure banner
   engine/             the WebGL engine
-    Main.ts           params, renderer, render loop, setup()
-    install.ts        publishes the engine modules under their global names
-    legacyScope.ts    typed access to the globals shared through window
+    Main.ts           params, renderer, render loop, setup(); owns the shared state
+    legacyScope.ts    typed accessors for the engine state shared between modules
     apps/
       AppFreefall.ts  the freefall application
       timeline/       Timescroll, TimelineLabel
@@ -73,12 +72,9 @@ src/
     components/       Header, HelpHints, FooterNav
     partners/         partners grid (store, nodes, component, facade)
     sidecontent/      item detail panel and help/share/app dialogs
-  legacy/             compatibility layer (no engine logic)
-    globals.ts        npm packages exposed as engine globals
+  legacy/             helpers shared by the engine
     gsapLegacy.ts     GSAP 2 style `TweenLite` facade over npm gsap
     twixLegacy.ts     fetch based ajax helper
-    threeLegacyCompat.ts  restored Three.js APIs
-    publishGlobals.ts helper that registers the modules globally
     loadLegacyEngine.ts   boots the engine once
 css/main.css          project stylesheet, bundled by Vite
 data/ imgs/           runtime static assets, copied to dist/ verbatim
@@ -128,17 +124,17 @@ path is still the argument, because that is what the callers pass.
 `src/legacy/` holds the shims that let the engine keep its original expectations;
 no engine logic lives there:
 
-* `globals.ts` exposes the npm packages as the globals the engine expects.
 * `gsapLegacy.ts` restores the `TweenLite.to(target, duration, vars)` signature
   over npm `gsap`, maps `alpha` → `opacity` for DOM targets (plain objects keep
   their own `alpha`, e.g. shader uniforms), converts an object `transformOrigin`
   and binds the `on*Scope` callbacks. The GSAP 2 ease objects (`Linear`, `Expo`,
-  `Back`, ...) are exposed as globals mapping to GSAP 3 ease strings.
-* `threeLegacyCompat.ts` restores removed Three.js APIs
-  (`PlaneBufferGeometry`, `BufferGeometry#addAttribute` / `#removeAttribute`,
-  `BufferAttribute#setDynamic`, `InstancedBufferGeometry#maxInstancedCount` and
-  `Object3D#getWorldQuaternion()` without a target).
+  `Back`, ...) are exported as `legacyEases` mapping to GSAP 3 ease strings.
 * `twixLegacy.ts` is the fetch based ajax helper the workers use.
+
+`three`, `hammerjs`, `gsap` and `twixLegacy` are imported directly by the modules
+that use them. The engine's own shared state (the camera, scene, renderer,
+application, atlas, `params` and the mutable flags in `Main.shared`) is exported
+and imported the same way: nothing is published on `window` any more.
 
 Three.js converts GLSL1 shaders to GLSL3 on WebGL2, where `texture2D` maps onto
 the built-in `texture()`. The `texture` uniform of the intro item and date label

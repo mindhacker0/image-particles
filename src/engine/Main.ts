@@ -1,10 +1,10 @@
 import { Color, PerspectiveCamera, Scene, Vector2, WebGLRenderer } from 'three'
 import { TweenLite, legacyEases } from '../legacy/gsapLegacy'
-import { publishGlobals } from '../legacy/publishGlobals'
 import { Atlas } from './atlas/Atlas'
 import { lod } from './atlas/lod/lod'
 import { clickManager } from './camera/ClickManager'
-import { bigbangFormula } from './formulas/BigbangFormula'
+import { cameraControls } from './camera/CameraControls'
+import { App } from './apps/AppFreefall'
 import { getQueryParams } from './utils/dom'
 
 /**
@@ -18,28 +18,13 @@ import { getQueryParams } from './utils/dom'
  *   `hideMetadata`, `displayIntroItem`, `disableCameraControls`,
  *   `geometryTweening`, `rendererWidth` / `rendererHeight`, `windowWidth` /
  *   `windowHeight`, the `numAssets*` counters, `preloadInterval`,
- *   `mouseWheelDeltaFactor*`, `currentUrl`, `hash`, `camHash`) stay on `window`
- *   and are read / written through the single typed `shared` view declared below.
- *   They must not become private module variables: `src/engine/legacyScope.ts`,
- *   `atlas/Metadatas.ts`, `camera/controls/*.ts` and the classic scripts read and
- *   write them by name, so a module local copy would fall out of sync (publishing
- *   a snapshot through `publishGlobals` would break that sharing the same way).
- * - `siteBaseUrl` and `resizeHCenteredElems` are part of this module's public API
- *   as well, so their `window` property is an accessor over the module variable
- *   (see `mirrorOnWindow`): live in both directions, and the exports keep working
- *   for the modules that import them.
+ *   `mouseWheelDeltaFactor*`, `currentUrl`, `hash`, `camHash`) live in the single
+ *   exported `shared` object below, so `src/engine/legacyScope.ts`,
+ *   `atlas/Metadatas.ts` and `camera/controls/*.ts` import and mutate it directly.
  * - the objects (`camera`, `scene`, `renderer`, `app`, `atlas`, `params`) are
- *   module variables that are published on `window` when they are created /
- *   assigned, because `Object.assign` copies the current *value*: every
- *   assignment publishes again.
- * - `setup(width, height)` used to be called by the last script of the original
- *   build block (`js/apps/app_freefall.js`, bottom line) and starts the app
- *   (`new App(camera)`, preload, `animate()`). It is only exported and published
- *   here, never called at import time: the caller (the port of `app_freefall.js`)
- *   invokes it through `window.setup`.
- * - `App` is still the classic global of `js/apps/app_freefall.js` (a parallel port
- *   is expected to publish it as `window.App`), read at call time like the classic
- *   script did.
+ *   exported module bindings (`let`), read at call time by the other modules.
+ * - `setup(width, height)` starts the app (`new App(camera)`, preload,
+ *   `animate()`). It is called by `bootFreefall()` after every module is loaded.
  * - the legacy `parseInt(<number>, 10)` calls become `parseInt(String(<number>), 10)`:
  *   `parseInt` requires a string and the implicit conversion it used to do is kept.
  * - `window.location = <url>` became `window.location.href = <url>`: the DOM types
@@ -94,13 +79,41 @@ export interface MainGlobals {
   currentUrl: string
   hash: string
   camHash: string
-  /** mirrored from the module binding below (see `mirrorOnWindow`) */
-  siteBaseUrl: string
-  /** mirrored from the module binding below (see `mirrorOnWindow`) */
-  resizeHCenteredElems: NodeListOf<HTMLElement>
 }
 
-const shared = window as unknown as MainGlobals
+/**
+ * The mutable state above, shared by reference: every module imports this very
+ * object (a module local copy would fall out of sync).
+ */
+export const shared: MainGlobals = {
+  renderNeeded: true,
+  hideMetadata: false,
+  displayIntroItem: false,
+  lockLOD: false,
+  disableCameraControls: false,
+  geometryTweening: false,
+  // `rendererWidth` / `rendererHeight` are undefined until `initTHREE` runs
+  rendererWidth: undefined as unknown as number,
+  rendererHeight: undefined as unknown as number,
+  windowWidth: window.innerWidth,
+  windowHeight: window.innerHeight,
+  numAssetsLoaded: 0,
+  numAssetsLoadedDisplay: 0,
+  numAssetsFormated: 0,
+  numAssetsTotal: 0,
+  numPartners: 0,
+  preloadInterval: -1,
+  mouseWheelDeltaFactor: 1,
+  mouseWheelDeltaFactorOrbit: 1,
+  mouseWheelDeltaFactor_default: 1,
+  mouseWheelDeltaFactor_defaultOrbit: 1,
+  mouseWheelDeltaFactor_freefall: 0.07,
+  mouseWheelDeltaFactor_tsne_max: 1.2,
+  mouseWheelDeltaFactor_tsne_min: 0.3,
+  currentUrl: '',
+  hash: '',
+  camHash: '',
+}
 
 /**
  * Hooks of the original embed pages. They were referenced by bare name in
@@ -174,45 +187,8 @@ shared.currentUrl = ''
 
 export let siteBaseUrl = 'https://artsexperiments.withgoogle.com/'
 
-/**
- * Keeps a module binding and its `window` property the same slot: the getter /
- * setter are installed once, so classic scripts assigning `window.siteBaseUrl`
- * update the exported binding and vice versa (a `publishGlobals` snapshot would
- * freeze at the value of the moment).
- *
- * The accessors read / write the module binding directly on purpose: the module
- * binding and `window[name]` are the same variable and `shared[name]` would call
- * the accessor again.
- */
-function mirrorOnWindow(
-  name: 'siteBaseUrl' | 'resizeHCenteredElems',
-  accessors: { get(): unknown; set(value: unknown): void },
-): void {
-  Object.defineProperty(window, name, {
-    configurable: true,
-    enumerable: true,
-    get: accessors.get,
-    set: accessors.set,
-  })
-}
-
-mirrorOnWindow('siteBaseUrl', {
-  get: () => siteBaseUrl,
-  set: (value) => {
-    siteBaseUrl = value as string
-  },
-})
-
-mirrorOnWindow('resizeHCenteredElems', {
-  get: () => resizeHCenteredElems,
-  set: (value) => {
-    resizeHCenteredElems = value as NodeListOf<HTMLElement>
-  },
-})
-
 /* ------------------------------------------------------------------------- *
- * The application object (`js/apps/app_freefall.js`), whose constructor is
- * still a classic global.
+ * The application object (`js/apps/app_freefall.js`).
  * ------------------------------------------------------------------------- */
 
 /** The members of the application object `js/main.js` drives. */
@@ -231,22 +207,6 @@ interface FreefallApp {
   setup(): void
 }
 
-/** `App` — `js/apps/app_freefall.js`, read at call time like the classic global was. */
-function AppConstructor(): new (camera: PerspectiveCamera) => FreefallApp {
-  return (window as unknown as { App: new (camera: PerspectiveCamera) => FreefallApp }).App
-}
-
-/** `cameraControls` — `js/camera/cameraControls.js`, read at call time. */
-interface MainCameraControls {
-  init(): void
-  state: number
-  VISUALIZER_WAVES: number
-}
-
-function cameraControls(): MainCameraControls {
-  return (window as unknown as { cameraControls: MainCameraControls }).cameraControls
-}
-
 /* ------------------------------------------------------------------------- *
  * The engine, in the original statement order.
  * ------------------------------------------------------------------------- */
@@ -254,11 +214,9 @@ function cameraControls(): MainCameraControls {
 export function appStart(): void {
   // setup the atlas
   atlas = new Atlas(params)
-  // `atlas.js` and the application read it from the global scope
-  publishGlobals({ atlas })
 
   //setup the controls
-  cameraControls().init()
+  cameraControls.init()
 
   scene.add(atlas.container)
 
@@ -346,7 +304,7 @@ export function checkTweenInterval(): void {
 export function setup(width: number, height: number): void {
   checkParams()
 
-  shared.siteBaseUrl += params.directChapter
+  siteBaseUrl += params.directChapter
 
   const supportsWebGL = (function () {
     try {
@@ -359,21 +317,18 @@ export function setup(width: number, height: number): void {
     }
   })()
   if (!supportsWebGL) {
-    window.location.href = shared.siteBaseUrl + '/not-supported'
+    window.location.href = siteBaseUrl + '/not-supported'
     return
   }
 
   // init threejs base items
   initTHREE(width, height)
-  const App = AppConstructor()
   app = new App(camera)
-  // the application and `atlas.js` read `app` from the global scope
-  publishGlobals({ app })
 
   const container = document.getElementsByClassName('cilex-content')[0]
   container.appendChild(renderer.domElement)
   //document.body.appendChild(renderer.domElement);
-  shared.resizeHCenteredElems = document.querySelectorAll<HTMLElement>('.h-recenter')
+  resizeHCenteredElems = document.querySelectorAll<HTMLElement>('.h-recenter')
   window.addEventListener('resize', onWindowResize, false)
 
   appStart()
@@ -383,7 +338,7 @@ export function setup(width: number, height: number): void {
       shared.geometryTweening ||
       shared.displayIntroItem ||
       shared.disableCameraControls ||
-      cameraControls().state == cameraControls().VISUALIZER_WAVES
+      cameraControls.state == cameraControls.VISUALIZER_WAVES
     )
       return
     // console.log( "setFromCamera" );
@@ -433,9 +388,6 @@ export function initTHREE(width: number, height: number): WebGLRenderer {
   })
   renderer.setPixelRatio(window.devicePixelRatio)
 
-  // publish before `clickManager.init` (and any other reader) runs
-  publishGlobals({ camera, scene, renderer })
-
   // directly show correct background color
   const c = new Color(params.clearColor)
   renderer.setClearColor(c)
@@ -484,11 +436,11 @@ export function onWindowResize(event: Event): void {
 }
 
 export function updateHCenteredPosition(): void {
-  for (let i = 0; i < shared.resizeHCenteredElems.length; i++)
-    shared.resizeHCenteredElems[i].style.top =
+  for (let i = 0; i < resizeHCenteredElems.length; i++)
+    resizeHCenteredElems[i].style.top =
       parseInt(
         String(
-          window.innerHeight * 0.5 - shared.resizeHCenteredElems[i].offsetHeight * 0.5,
+          window.innerHeight * 0.5 - resizeHCenteredElems[i].offsetHeight * 0.5,
         ),
         10,
       ) + 'px'
@@ -527,7 +479,7 @@ export function disableUI(): void {
 }
 
 export function updateUrl(chapter: string, sub: string): void {
-  shared.currentUrl = shared.siteBaseUrl + chapter + '/' + sub
+  shared.currentUrl = siteBaseUrl + chapter + '/' + sub
 }
 
 //-----------------------------------------
@@ -592,38 +544,3 @@ export const params: MainParams = {
 
   isMobile: document.body.classList.contains('mobile'),
 }
-
-// `params` is shared by reference: every reader gets this very object
-publishGlobals({ params })
-
-/* ------------------------------------------------------------------------- *
- * Publishing. The names below are the globals the remaining classic scripts
- * (`js/apps/app_freefall.js`, `js/camera/cameraControls.js`, `js/ui/*.js`) look
- * up. The objects and the primitives above are not listed: the objects are
- * published where they are assigned and the primitives already live on `window`.
- * ------------------------------------------------------------------------- */
-
-publishGlobals({
-  setup,
-  initTHREE,
-  animate,
-  appStart,
-  goSetup,
-  onAtlasLoadComplete,
-  onAtlasLoadProgress,
-  updateLoader,
-  checkParams,
-  onWindowResize,
-  enableUI,
-  disableUI,
-  updateHCenteredPosition,
-  checkTweenInterval,
-  getQueryParamInt,
-  updateUrl,
-  // the classic `js/camera/clickManager.js` global, now served by this port
-  clickManager,
-  // the other formulas are published by `src/engine/install.ts`, which cannot be
-  // touched here: `js/apps/app_freefall.js` (and its port) reads `bigbangFormula`
-  // from the global scope, so the bootstrap publishes it
-  bigbangFormula,
-})

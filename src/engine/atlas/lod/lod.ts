@@ -1,4 +1,4 @@
-import { Vector3 } from 'three'
+import { Quaternion, Vector3 } from 'three'
 import { EventDispatcher } from '../../utils/events'
 import { atlasAssets, legacyCamera, legacyCameraControls, legacyParams } from '../../legacyScope'
 import { map } from '../../utils/math'
@@ -279,10 +279,12 @@ function collectGridItems(position: { x: number; y: number; z: number }, results
 const bound = 1.25
 const vertex = new Vector3()
 const frontVec = new Vector3(0, 0, 1)
+// three's `getWorldQuaternion(target)` writes into the target it is given.
+const worldQuaternion = new Quaternion()
 
 function getOnScreen(camera: {
   position: Vector3
-  getWorldQuaternion(): { x: number; y: number; z: number; w: number }
+  getWorldQuaternion(target: Quaternion): Quaternion
   projectionMatrix?: unknown
 }): GridAsset[] | null {
   const results: GridAsset[] = []
@@ -299,7 +301,7 @@ function getOnScreen(camera: {
 
   // retrieve camera's forward vector
   const output: GridAsset[] = []
-  frontVec.set(0, 0, 1).applyQuaternion(camera.getWorldQuaternion() as never)
+  frontVec.set(0, 0, 1).applyQuaternion(camera.getWorldQuaternion(worldQuaternion))
 
   for (let i = 0; i < results.length; i++) {
     // skip if vertex too close, too far or behind the camera

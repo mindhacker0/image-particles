@@ -18,9 +18,8 @@ import { legacyCamera } from '../../legacyScope'
  * `Timescroll.update`).
  *
  * Port notes:
- * - `Mesh` here is three's own `Mesh`: the legacy code used `THREE.Mesh`, which
- *   is not the ported atlas tile class (`src/engine/atlas/Mesh.ts`) that
- *   `install.ts` publishes as the `Mesh` global.
+ * - `Mesh` here is three's own `Mesh`, imported from `three` (the ported atlas
+ *   tile class lives in `src/engine/atlas/Mesh.ts`).
  * - The legacy constructor called `this.createMap()` / `this.createMaterial()`
  *   *before* `THREE.Mesh.call(...)`. A class cannot touch `this` before
  *   `super()`, so the canvas is built by the module private helpers below (the

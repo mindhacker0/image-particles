@@ -1,5 +1,7 @@
 import * as THREE from 'three'
 import { TweenLite } from '../../../legacy/gsapLegacy'
+import { cameraControls as engineCameraControls } from '../CameraControls'
+import { shared } from '../../Main'
 import { atlasInstance, legacyCamera, legacyParams } from '../../legacyScope'
 import { dateLabels } from '../../atlas/DateLabels'
 import { type LegacyWheelEvent } from '../../utils/functions'
@@ -38,9 +40,9 @@ import { norm } from '../../utils/math'
  * evaluated / imported.
  * ------------------------------------------------------------------------- */
 
-/** `mouseWheelDeltaFactor` (`js/main.js`), reassigned by `cameraControls.setState`. */
+/** `mouseWheelDeltaFactor`, reassigned by `cameraControls.setState`. */
 function mouseWheelDeltaFactor(): number {
-  return (window as unknown as { mouseWheelDeltaFactor: number }).mouseWheelDeltaFactor
+  return shared.mouseWheelDeltaFactor
 }
 
 /** One entry of `cameraControls.boundingBoxes` (built by the timeline app). */
@@ -87,7 +89,7 @@ interface TimelineControlsContext {
 }
 
 function cameraControls(): TimelineControlsContext {
-  return (window as unknown as { cameraControls: TimelineControlsContext }).cameraControls
+  return engineCameraControls as unknown as TimelineControlsContext
 }
 
 /**

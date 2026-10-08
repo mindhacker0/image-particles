@@ -1,3 +1,4 @@
+import { shared } from '../../engine/Main'
 import { legacyParams } from '../../engine/legacyScope'
 import { Twix, type LegacyRequest } from '../../legacy/twixLegacy'
 import { partnersNodes } from './nodes'
@@ -33,21 +34,12 @@ import { getPartnersState, setPartnersState, type PartnerEntry, type PartnerItem
  *   for `resize` (both are owned by `src/engine/Main.ts`)
  */
 
-/** The two globals `js/main.js` keeps up to date (`src/engine/Main.ts`). */
-interface LegacyWindowSize {
-  windowWidth?: number
-  windowHeight?: number
-}
-
 function windowWidth(): number {
-  // `??` and not `||`: the globals are set to `window.innerWidth` at import time
-  // of Main.ts, the fallback only covers a call before that module ran (where the
-  // original globals were `undefined` and `resize` wrote `NaN`)
-  return (window as unknown as LegacyWindowSize).windowWidth ?? window.innerWidth
+  return shared.windowWidth
 }
 
 function windowHeight(): number {
-  return (window as unknown as LegacyWindowSize).windowHeight ?? window.innerHeight
+  return shared.windowHeight
 }
 
 const PARTNER_URL_BASE = 'https://www.google.com/culturalinstitute/beta/partner/'
@@ -246,11 +238,6 @@ export class PartnersUi {
   }
 }
 
-// `js/ui/partners_ui.js` declared the class as the global `PartnersUi`, and
-// `src/ui/ChapterUi.ts` still resolves `this.partners` through that name. The
-// port keeps it available (like `src/engine/install.ts` publishes `ChapterUi`),
-// but only if the global is free: while the classic script is still listed in
-// `src/legacy/scriptOrder.ts` it loads later and keeps ownership of the name.
-const partnerGlobalScope = window as unknown as { PartnersUi?: typeof PartnersUi }
-
-partnerGlobalScope.PartnersUi ??= PartnersUi
+// `js/ui/partners_ui.js` declared the class as the global `PartnersUi`; the port
+// imports it where it is used (`src/ui/ChapterUi.ts`) instead of relying on a
+// global name.

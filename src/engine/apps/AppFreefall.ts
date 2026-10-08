@@ -20,6 +20,8 @@ import {
   legacyParams,
   markRenderNeeded,
 } from '../legacyScope'
+import { animate as mainAnimate, enableUI as mainEnableUI, setup as mainSetup, shared } from '../Main'
+import { bigbangFormula } from '../formulas/BigbangFormula'
 import { getCurrentUrl } from '../utils/functions'
 import { Sidect } from '../../ui/sidecontent/SideContentFacade'
 
@@ -121,7 +123,7 @@ interface LegacyWindowPrimitives {
 }
 
 function legacyWindow(): LegacyWindowPrimitives {
-  return window as unknown as LegacyWindowPrimitives
+  return shared
 }
 
 /* ------------------------------------------------------------------------- *
@@ -138,9 +140,9 @@ interface BigbangFormula {
   apply(assets: Asset[], commit: boolean | string): void
 }
 
-/** legacy global owned by js/atlas/formulas/bigbang_formula.js */
+/** the `bigbangFormula` module (`formulas/BigbangFormula`) */
 function bigbangFormulaRef(): BigbangFormula {
-  return (window as unknown as { bigbangFormula: BigbangFormula }).bigbangFormula
+  return bigbangFormula as unknown as BigbangFormula
 }
 
 /**
@@ -182,14 +184,14 @@ function atlasRef(): Atlas {
   return atlasInstance() as unknown as Atlas
 }
 
-/** legacy global owned by js/main.js */
+/** `Main.enableUI` */
 function enableUI(): void {
-  ;(window as unknown as { enableUI(): void }).enableUI()
+  mainEnableUI()
 }
 
-/** legacy global owned by js/main.js */
+/** `Main.animate` */
 function animate(): void {
-  ;(window as unknown as { animate(): void }).animate()
+  mainAnimate()
 }
 
 /** legacy global owned by js/camera/cameraControls.js */
@@ -693,12 +695,8 @@ export class App {
  *
  * It must not run at import time any more: the engine loader calls
  * `bootFreefall()` once, after all the ported modules have been installed
- * (`js/main.js` publishes `setup` as a global).
+ * (`Main` exports `setup`).
  */
 export function bootFreefall(): void {
-  // legacy global owned by js/main.js
-  ;(window as unknown as { setup(width: number, height: number): void }).setup(
-    window.innerWidth,
-    window.innerHeight,
-  )
+  mainSetup(window.innerWidth, window.innerHeight)
 }

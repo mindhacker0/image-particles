@@ -1,32 +1,10 @@
 /**
  *
- * The original classic script declared these helpers in the global scope; the
- * exported names are published through `src/engine/install.ts` so the remaining
- * classic scripts keep working unchanged.
+ * The utilities the original classic script declared in the global scope, now
+ * imported as ESM by the modules that use them.
  */
 
 export const supportsPassive = false
-
-/**
- * Restores the `Function.prototype.subclass` helper the legacy bundle installed
- * for its prototype based inheritance.
- */
-export function installFunctionSubclass(): void {
-  const prototype = Function.prototype as unknown as Record<string, unknown>
-  if (typeof prototype.subclass === 'function') return
-
-  type NonConstructor = { new (): unknown; prototype: unknown }
-
-  const nonconstructor = function () {} as unknown as NonConstructor
-
-  const subclass = function (this: { prototype: unknown }, base: { prototype: unknown }) {
-    nonconstructor.prototype = base.prototype
-    this.prototype = new nonconstructor()
-  } as unknown as Record<string, unknown> & ((base: unknown) => void)
-
-  subclass.nonconstructor = nonconstructor
-  prototype.subclass = subclass
-}
 
 export function createCookie(name: string, value: string, days?: number): void {
   let expires = ''

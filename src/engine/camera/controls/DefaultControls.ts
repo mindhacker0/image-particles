@@ -1,5 +1,7 @@
 import * as THREE from 'three'
 import { TweenLite } from '../../../legacy/gsapLegacy'
+import { cameraControls as engineCameraControls } from '../CameraControls'
+import { shared } from '../../Main'
 import { legacyCamera, legacyScene } from '../../legacyScope'
 import { normalizeWheel, type LegacyWheelEvent } from '../../utils/functions'
 import { lerp, map, norm } from '../../utils/math'
@@ -52,9 +54,9 @@ const RAD = Math.PI / 180
  */
 declare const CuratorChapter: { min: { x: number; y: number }; max: { x: number; y: number } }
 
-/** `mouseWheelDeltaFactor` (`js/main.js`), reassigned by `cameraControls.setState`. */
+/** `mouseWheelDeltaFactor`, reassigned by `cameraControls.setState`. */
 function mouseWheelDeltaFactor(): number {
-  return (window as unknown as { mouseWheelDeltaFactor: number }).mouseWheelDeltaFactor
+  return shared.mouseWheelDeltaFactor
 }
 
 /**
@@ -106,7 +108,7 @@ interface DefaultControlsContext {
 }
 
 function cameraControls(): DefaultControlsContext {
-  return (window as unknown as { cameraControls: DefaultControlsContext }).cameraControls
+  return engineCameraControls as unknown as DefaultControlsContext
 }
 
 /**

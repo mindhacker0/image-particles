@@ -1,6 +1,7 @@
 import { Color, Vector3, type PerspectiveCamera } from 'three'
 import type { Atlas } from '../atlas/Atlas'
 import { PRNG } from '../atlas/utils'
+import { shared } from '../Main'
 import { atlasInstance, legacyCameraControls, legacyCamera, markRenderNeeded, type FormulaAsset } from '../legacyScope'
 import { ColorFormula } from './ColorFormula'
 import { RandomFormula, type RandomFormulaAmplitude } from './RandomFormula'
@@ -69,9 +70,9 @@ function atlas(): Atlas {
   return atlasInstance() as unknown as Atlas
 }
 
-/** `displayIntroItem`, a mutable primitive shared through `window` (owned by `src/engine/Main.ts`). */
+/** `displayIntroItem`, a mutable primitive owned by `Main`. */
 function setDisplayIntroItem(value: boolean): void {
-  ;(window as unknown as { displayIntroItem: boolean }).displayIntroItem = value
+  shared.displayIntroItem = value
 }
 
 /** The public surface of the module, i.e. the legacy `bigbangFormula` object. */

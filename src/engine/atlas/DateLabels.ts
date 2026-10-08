@@ -10,6 +10,7 @@ import {
   type WebGLRenderer,
 } from 'three'
 import { TweenLite } from '../../legacy/gsapLegacy'
+import { renderer } from '../Main'
 import { atlasInstance, legacyCamera, markRenderNeeded } from '../legacyScope'
 import { canvasUtils } from '../utils/canvas'
 import { GrowingPacker, type PackerBlock, type PackerNode } from '../utils/GrowingPacker'
@@ -88,9 +89,9 @@ const materials: ShaderMaterial[] = []
 let mesh: DateLabelsMesh
 let ready = false
 
-/** legacy global owned by `src/engine/Main.ts` (the render loop) */
+/** the renderer created by `Main.initTHREE` */
 function legacyRenderer(): WebGLRenderer {
-  return (window as unknown as { renderer: WebGLRenderer }).renderer
+  return renderer
 }
 
 function isPowerOfTwo(value: number): boolean {

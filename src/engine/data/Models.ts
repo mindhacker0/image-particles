@@ -5,17 +5,18 @@
  * properties) and the helpers that fill it.
  *
  * Notes on the port:
- * - every global the classic script created is exported under the same name;
- *   `src/engine/install.ts` publishes them on `window`
+ * - every global the classic script created is exported under the same name and
+ *   imported as ESM by the modules that use them
  * - `createLegacyWorker` and the colour helpers are the already ported modules;
  *   the worker script itself (`js/works/models.js`) is untouched and still
  *   posts the same messages for the same backend urls
- * - `atlas` still belongs to `js/atlas/atlas.js`, so it is read through the
+ * - `atlas` is owned by `src/engine/Main.ts`, so it is read through the
  *   shared accessor of `src/engine/legacyScope.ts`
  * - the image urls (`data/rasterfairy.png`, `data/timeline.png`,
  *   `data/colors.png`, `data/heightmap.png`, `data/tsne.bin`) and the request
  *   payloads are unchanged
  */
+import { Vector2 } from 'three'
 import type { Asset } from '../atlas/Asset'
 import { atlasInstance } from '../legacyScope'
 import { convertColor, rgbToHex } from '../utils/color'
@@ -470,8 +471,8 @@ export function getTsne(callback?: () => void): void {
 
     var hex_x = "", hex_y = "", tx = 0, ty =0, parsingIndex = 0, i = 0, asset = null;
 
-    ImageTsneFormula.min = new THREE.Vector2(Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY);
-    ImageTsneFormula.max = new THREE.Vector2(Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY);
+    ImageTsneFormula.min = new Vector2(Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY);
+    ImageTsneFormula.max = new Vector2(Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY);
 
     for (var y = 0; y < pixelData.height; y++) {
       for (var x = 0; x < pixelData.width; x++) {

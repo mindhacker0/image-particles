@@ -8,10 +8,9 @@ import App from './App'
 /**
  * Application bootstrap.
  *
- * Legacy engine wiring lives in `src/legacy/`:
- *   globals.ts          npm packages exposed as the globals the engine expects
+ * Engine wiring lives in `src/legacy/`:
  *   gsapLegacy.ts       GSAP 2 style `TweenLite` facade over npm gsap
- *   scriptOrder.ts      original script load order
+ *   twixLegacy.ts       fetch based ajax helper
  *   loadLegacyEngine.ts sequential, once-only loader
  */
 const container = document.getElementById('react-root')

@@ -1,5 +1,14 @@
 import * as THREE from 'three'
+import { OrbitControls as OrbitControlsImpl } from 'three/examples/jsm/controls/OrbitControls.js'
+import { TrackballControls as TrackballControlsImpl } from 'three/examples/jsm/controls/TrackballControls.js'
+import Hammer from 'hammerjs'
 import { TweenLite, legacyEases } from '../../legacy/gsapLegacy'
+import {
+  disableUI as mainDisableUI,
+  enableUI as mainEnableUI,
+  renderer as mainRenderer,
+  shared,
+} from '../Main'
 import { lod } from '../atlas/lod/lod'
 import { atlasInstance, legacyCamera, legacyParams, markRenderNeeded } from '../legacyScope'
 import { EventDispatcher } from '../utils/events'
@@ -27,27 +36,24 @@ import { tsneControls } from './controls/TsneControls'
  * Port notes:
  * - `lerp` / `norm` / `map` were declared here (byte-identical bodies to the
  *   shared copies). They now live in `../utils/math`; this file only still uses
- *   `lerp`. The other module globals (`PI`, `PI2`, `RAD`, `DEG`, `hasNan`, `cc`)
- *   are exported so `install.ts` can keep publishing them.
+ *   `lerp`. The other module constants (`PI`, `PI2`, `RAD`, `DEG`, `hasNan`, `cc`)
+ *   are exported for the other camera modules.
  * - `TweenLite` and the `Expo` / `Cubic` eases come from the GSAP 2 facade
  *   (`../../legacy/gsapLegacy`), whose `to(target, duration, vars)` signature
  *   matches the original calls.
- * - `THREE.OrbitControls` / `THREE.TrackballControls` are read from the `THREE`
- *   global installed by `src/legacy/globals.ts` (that module installs them on
- *   `window.THREE` instead of exporting them); geometry / material / vector
- *   classes come from the npm `three` import, like the other ported modules.
+ * - `OrbitControls`, `TrackballControls` and `Hammer` are imported from their
+ *   npm packages, like the geometry / material / vector classes.
  * - `renderNeeded = true` is written through `markRenderNeeded()`.
  * - The `camera` global is read through `camera()`; the long functions bind it
  *   to a local `cam` (the original re-read the global on every statement).
- * - Globals still owned by classic scripts (`renderer`, `params`,
+ * - The state owned by other modules (`renderer`, `params`,
  *   `displayIntroItem`, `disableCameraControls`, `lockLOD`,
- *   `mouseWheelDeltaFactor*`, `disableUI` / `enableUI`, `Hammer`, the `atlas`
- *   instance) are read at call time through the small typed helpers below.
+ *   `mouseWheelDeltaFactor*`, `disableUI` / `enableUI`, the `atlas` instance)
+ *   is read at call time through the small typed helpers below.
  * - `hammer.off('doubletap', onDoubleTap, false)` references a handler that no
  *   file defines: see the ambient declaration below.
- * - The private `hammer` variable became `hammerInstance`, so it does not clash
- *   with the `hammer()` helper that reads the global (every public member keeps
- *   its name).
+ * - The private `hammer` variable became `hammerInstance` (every public member
+ *   keeps its name).
  *
  * Fixed while porting (each one documented at its call site):
  * - `update()`'s fail-safe restored the camera with `camera.copy(lastCamera)`
@@ -69,10 +75,9 @@ import { tsneControls } from './controls/TsneControls'
  */
 
 /**
- * Module globals of `js/camera/cameraControls.js`. The ported controls
+ * Module constants of `js/camera/cameraControls.js`. The ported controls
  * (`DefaultControls`, `TsneControls`) keep private copies of `PI` / `RAD` to
- * avoid depending on this file's load order; the exports here are what
- * `install.ts` publishes as page globals.
+ * avoid depending on this file's load order.
  */
 export const PI = Math.PI
 export const PI2 = Math.PI * 2
@@ -90,9 +95,9 @@ export function hasNan(v: { x: number; y: number; z: number }): boolean {
  * evaluated / imported.
  * ------------------------------------------------------------------------- */
 
-/** `renderer` (`js/main.js`). */
+/** `renderer` (`Main.initTHREE`). */
 function renderer(): { domElement: ControlDomElement } {
-  return (window as unknown as { renderer: { domElement: ControlDomElement } }).renderer
+  return mainRenderer as unknown as { domElement: ControlDomElement }
 }
 
 /**
@@ -104,50 +109,49 @@ function windowWheelHandlers(): { onwheel?: unknown; onmousewheel?: unknown } {
   return window as unknown as { onwheel?: unknown; onmousewheel?: unknown }
 }
 
-/** `lockLOD` (`js/main.js`), locked while the user drags / wheels. */
+/** `lockLOD`, locked while the user drags / wheels. */
 function lockLOD(): boolean {
-  return (window as unknown as { lockLOD: boolean }).lockLOD
+  return shared.lockLOD
 }
 
-/** `lockLOD` (`js/main.js`), written by the pointer handlers and by `update()`. */
+/** `lockLOD`, written by the pointer handlers and by `update()`. */
 function setLockLOD(value: boolean): void {
-  ;(window as unknown as { lockLOD: boolean }).lockLOD = value
+  shared.lockLOD = value
 }
 
-/** `disableCameraControls` (`js/main.js`), set by `disableUI` / `enableUI`. */
+/** `disableCameraControls`, set by `disableUI` / `enableUI`. */
 function disableCameraControls(): boolean {
-  return (window as unknown as { disableCameraControls: boolean }).disableCameraControls
+  return shared.disableCameraControls
 }
 
-/** `displayIntroItem` (`js/main.js`), true while the freefall intro is shown. */
+/** `displayIntroItem`, true while the freefall intro is shown. */
 function displayIntroItem(): boolean {
-  return (window as unknown as { displayIntroItem: boolean }).displayIntroItem
+  return shared.displayIntroItem
 }
 
-/** `disableUI` (`js/main.js`): loading overlay + camera lock. */
+/** `disableUI` (`Main`): loading overlay + camera lock. */
 function disableUI(): void {
-  ;(window as unknown as { disableUI(): void }).disableUI()
+  mainDisableUI()
 }
 
-/** `enableUI` (`js/main.js`): hides the loading overlay, releases the camera. */
+/** `enableUI` (`Main`): hides the loading overlay, releases the camera. */
 function enableUI(): void {
-  ;(window as unknown as { enableUI(): void }).enableUI()
+  mainEnableUI()
 }
 
-/** `mouseWheelDeltaFactor` (`js/main.js`), assigned by `setState`. */
+/** `mouseWheelDeltaFactor`, assigned by `setState`. */
 function setMouseWheelDeltaFactor(value: number): void {
-  ;(window as unknown as { mouseWheelDeltaFactor: number }).mouseWheelDeltaFactor = value
+  shared.mouseWheelDeltaFactor = value
 }
 
-/** `mouseWheelDeltaFactor_default` (`js/main.js`). */
+/** `mouseWheelDeltaFactor_default`. */
 function mouseWheelDeltaFactorDefault(): number {
-  return (window as unknown as { mouseWheelDeltaFactor_default: number }).mouseWheelDeltaFactor_default
+  return shared.mouseWheelDeltaFactor_default
 }
 
-/** `mouseWheelDeltaFactor_freefall` (`js/main.js`). */
+/** `mouseWheelDeltaFactor_freefall`. */
 function mouseWheelDeltaFactorFreefall(): number {
-  return (window as unknown as { mouseWheelDeltaFactor_freefall: number })
-    .mouseWheelDeltaFactor_freefall
+  return shared.mouseWheelDeltaFactor_freefall
 }
 
 /**
@@ -191,22 +195,11 @@ type CameraControlEvent = LegacyWheelEvent & {
   center: { x: number; y: number }
 }
 
-/** `Hammer` (installed from npm by `src/legacy/globals.ts`). */
+/** `Hammer` as this module drives it (the `@types/hammerjs` façade is narrower). */
 interface HammerInstance {
   on(event: string, handler: (event: CameraControlEvent) => void, useCapture: boolean): void
   off(event: string, handler: (event: CameraControlEvent) => void, useCapture: boolean): void
   add(recognizer: unknown): void
-}
-
-interface HammerStatic {
-  new (element: ControlDomElement, options?: Record<string, unknown>): HammerInstance
-  DIRECTION_ALL: number
-  Pan: new (options: Record<string, unknown>) => unknown
-  Tap: new (options: Record<string, unknown>) => unknown
-}
-
-function hammer(): HammerStatic {
-  return (window as unknown as { Hammer: HammerStatic }).Hammer
 }
 
 /**
@@ -248,21 +241,6 @@ interface TrackballControls {
   minDistance: number
   maxDistance: number
   update(): boolean
-}
-
-/** The `THREE` global installed by `src/legacy/globals.ts`. */
-interface LegacyThreeGlobal {
-  OrbitControls: new (camera: THREE.Camera, domElement: ControlDomElement) => OrbitControls
-  TrackballControls: new (camera: THREE.Camera, domElement: ControlDomElement) => TrackballControls
-}
-
-/**
- * The two control classes are taken off the `THREE` global: `src/legacy/globals.ts`
- * installs the npm `OrbitControls` / `TrackballControls` there (next to the
- * compat aliases) instead of exporting them.
- */
-function legacyThree(): LegacyThreeGlobal {
-  return (window as unknown as { THREE: LegacyThreeGlobal }).THREE
 }
 
 /**
@@ -503,14 +481,19 @@ export const cameraControls: CameraControls = (function (exports: CameraControls
     cam.position.y = 1000000
     cam.position.z = 1000000
 
-    const three = legacyThree()
-    orbitControls = new three.OrbitControls(cam, renderer().domElement)
+    orbitControls = new OrbitControlsImpl(
+      cam,
+      renderer().domElement as unknown as HTMLElement,
+    ) as unknown as OrbitControls
     orbitControls.enableDamping = true
     orbitControls.dampingFactor = 0.05
     orbitControls.enableKeys = false
     exports.orbitControls = orbitControls
 
-    trackball = new three.TrackballControls(cam, renderer().domElement)
+    trackball = new TrackballControlsImpl(
+      cam,
+      renderer().domElement as unknown as HTMLElement,
+    ) as unknown as TrackballControls
     trackball.enabled = false
     exports.trackball = trackball
 
@@ -527,8 +510,9 @@ export const cameraControls: CameraControls = (function (exports: CameraControls
 
     //event dispatcher
     events = new EventDispatcher()
-    const Hammer = hammer()
-    hammerInstance = new Hammer(renderer().domElement)
+    hammerInstance = new Hammer(
+      renderer().domElement as unknown as HTMLElement,
+    ) as unknown as HammerInstance
     hammerInstance.add(new Hammer.Pan({ direction: Hammer.DIRECTION_ALL, threshold: 0 }))
     hammerInstance.add(new Hammer.Tap({ interval: 0, time: 500, threshold: 5 }))
     exports.addListeners()

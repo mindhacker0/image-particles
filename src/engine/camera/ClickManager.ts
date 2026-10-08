@@ -10,6 +10,14 @@ import type { Asset } from '../atlas/Asset'
 import type { Atlas } from '../atlas/Atlas'
 import type { MetadataAsset } from '../atlas/Metadatas'
 import { tsneSphere } from '../atlas/TsneSphere'
+import { cameraControls as engineCameraControls } from './CameraControls'
+import {
+  app as engineApp,
+  atlas as engineAtlas,
+  camera as engineCamera,
+  renderer as engineRenderer,
+  scene as engineScene,
+} from '../Main'
 
 /**
  * Ported from `js/camera/clickManager.js`.
@@ -26,10 +34,8 @@ import { tsneSphere } from '../atlas/TsneSphere'
  *   object with the same members (`init`, `update`, `setSize`, `pick`,
  *   `pickingTexture`, `pixelBuffer`); it is published as the `clickManager`
  *   global by `src/engine/Main.ts`
- * - `Hammer` is imported from the npm package (`installLegacyGlobals` only
- *   publishes it on `window`, and the classic `js/camera/clickManager.js` reads
- *   it there); the imported `HammerStatic` / `HammerManager` / `HammerInput`
- *   types come from `@types/hammerjs`
+ * - `Hammer` is imported from the npm package; the imported `HammerStatic` /
+ *   `HammerManager` / `HammerInput` types come from `@types/hammerjs`
  * - `three` and `tsneSphere` come from the ported modules; the
  *   globals of `src/engine/Main.ts` (`renderer`, `scene`, `camera`, `atlas`,
  *   `app`) and of `js/camera/cameraControls.js` (`cameraControls`) are read at
@@ -88,34 +94,34 @@ interface ClickApp {
  * yet while this module is evaluated.
  * ------------------------------------------------------------------------- */
 
-/** `renderer` — created by `initTHREE` in `src/engine/Main.ts`. */
+/** the renderer created by `Main.initTHREE`. */
 function renderer(): WebGLRenderer {
-  return (window as unknown as { renderer: WebGLRenderer }).renderer
+  return engineRenderer
 }
 
-/** `scene` — created by `initTHREE` in `src/engine/Main.ts`. */
+/** the scene created by `Main.initTHREE`. */
 function scene(): Scene {
-  return (window as unknown as { scene: Scene }).scene
+  return engineScene
 }
 
-/** `camera` — created by `initTHREE` in `src/engine/Main.ts`. */
+/** the camera created by `Main.initTHREE`. */
 function camera(): PerspectiveCamera {
-  return (window as unknown as { camera: PerspectiveCamera }).camera
+  return engineCamera
 }
 
-/** `atlas` — the atlas instance created by `appStart` in `src/engine/Main.ts`. */
+/** the atlas instance created by `Main.appStart`. */
 function atlas(): Atlas {
-  return (window as unknown as { atlas: Atlas }).atlas
+  return engineAtlas
 }
 
-/** `cameraControls` — `js/camera/cameraControls.js`, not ported yet. */
+/** the engine's camera controls. */
 function cameraControls(): ClickCameraControls {
-  return (window as unknown as { cameraControls: ClickCameraControls }).cameraControls
+  return engineCameraControls as unknown as ClickCameraControls
 }
 
-/** `app` — `js/apps/app_freefall.js`, not ported yet. */
+/** the application object built by `Main.setup`. */
 function app(): ClickApp {
-  return (window as unknown as { app: ClickApp }).app
+  return engineApp as unknown as ClickApp
 }
 
 /** The public surface of the module, i.e. the legacy `clickManager` object. */

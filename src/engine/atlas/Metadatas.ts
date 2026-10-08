@@ -9,6 +9,9 @@ import {
   type Vector3,
 } from 'three'
 import { TweenLite } from '../../legacy/gsapLegacy'
+import { cameraControls } from '../camera/CameraControls'
+import { getItem } from '../data/Models'
+import { app, shared } from '../Main'
 import { atlasInstance, legacyCamera, legacyParams, modelItems } from '../legacyScope'
 import { MetaDataMaterial } from './MetadataMaterial'
 import { lod } from './lod/lod'
@@ -20,9 +23,8 @@ import { lod } from './lod/lod'
  * visible asset, drawn into a canvas texture (`MetaDataMaterial`).
  *
  * Port notes:
- * - `Mesh` is three's own `Mesh` (NOT the ported `atlas/Mesh.ts` tile class the
- *   legacy `THREE.Mesh` global gets shadowed by once `install.ts` publishes the
- *   atlas globals), and `PlaneBufferGeometry` became `PlaneGeometry`.
+ * - `Mesh` is three's own `Mesh`, imported from `three` (NOT the ported
+ *   `atlas/Mesh.ts` tile class), and `PlaneBufferGeometry` became `PlaneGeometry`.
  * - The three `labelLink*ImageLoaded` globals were plain booleans flipped by
  *   their image's `onload`. A plain `export let` would only be published as the
  *   initial `false` snapshot, so they are exported as small mutable holders
@@ -779,42 +781,44 @@ export class MetadataLabel extends Mesh {
  * evaluated / imported.
  * ------------------------------------------------------------------------- */
 
-/** `renderNeeded`, a legacy global owned by the render loop in `js/main.js`. */
+/** `renderNeeded` (set by `Main.animate`): true when a frame has to be rendered. */
 function getRenderNeeded(): boolean {
-  return (window as unknown as { renderNeeded: boolean }).renderNeeded
+  return shared.renderNeeded
 }
 
 function setRenderNeeded(value: boolean): void {
-  ;(window as unknown as { renderNeeded: boolean }).renderNeeded = value
+  shared.renderNeeded = value
 }
 
-/** `hideMetadata`, a legacy boolean owned by `js/main.js`. */
+/** `hideMetadata`, owned by `Main`. */
 function hideMetadata(): boolean {
-  return (window as unknown as { hideMetadata: boolean }).hideMetadata
+  return shared.hideMetadata
 }
 
-/** `window.tempCnvs`, the scratch canvas the first label creates. */
+/** scratch canvas the first label creates. */
+let tempCanvas: HTMLCanvasElement
+
 function getTempCanvas(): HTMLCanvasElement {
-  return (window as unknown as { tempCnvs: HTMLCanvasElement }).tempCnvs
+  return tempCanvas
 }
 
 function setTempCanvas(canvas: HTMLCanvasElement): void {
-  ;(window as unknown as { tempCnvs: HTMLCanvasElement }).tempCnvs = canvas
+  tempCanvas = canvas
 }
 
-/** `getItem`, a legacy global defined in `js/data/models.js`. */
+/** `getItem` of the model layer (`data/Models`). */
 function legacyGetItem(): (id: string, callback: (item: unknown) => void) => void {
-  return (window as unknown as { getItem: (id: string, callback: (item: unknown) => void) => void }).getItem
+  return getItem as unknown as (id: string, callback: (item: unknown) => void) => void
 }
 
-/** `cameraControls` (`js/camera/cameraControls.js`); `gotoAsset` is called on it. */
+/** `cameraControls`; `gotoAsset` is called on it. */
 function currentCameraControls(): { gotoAsset(asset: unknown): void } {
-  return (window as unknown as { cameraControls: { gotoAsset(asset: unknown): void } }).cameraControls
+  return cameraControls as unknown as { gotoAsset(asset: unknown): void }
 }
 
-/** `app.currentColor` (`js/apps/app_freefall.js`); a css string or a `THREE.Color`. */
+/** `app.currentColor` (a css string or a `THREE.Color`). */
 function appCurrentColor(): unknown {
-  return (window as unknown as { app: { currentColor: unknown } }).app.currentColor
+  return (app as unknown as { currentColor: unknown }).currentColor
 }
 
 /** `atlas` (`js/atlas/atlas.js`) as this module uses it. */
