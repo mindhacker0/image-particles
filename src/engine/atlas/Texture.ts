@@ -1,6 +1,6 @@
 import type { Texture as ThreeTexture } from 'three'
 
-/** 纹理中单个资产的像素坐标。 */
+/** 纹理中单个资源的像素坐标。 */
 export interface TextureCoords {
   x: number
   y: number

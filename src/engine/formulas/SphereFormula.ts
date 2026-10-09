@@ -2,7 +2,7 @@ import { Vector3 } from 'three'
 import type { FormulaAsset } from '../legacyScope'
 
 /**
- * 用黄金角螺旋（向日葵）布局在球面上分布资产。
+ * 用黄金角螺旋（向日葵）布局在球面上分布资源。
  *
  * `numSpirals` 仅为兼容构造签名保留，当前螺旋布局并不使用它。
  */

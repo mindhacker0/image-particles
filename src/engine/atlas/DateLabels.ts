@@ -10,7 +10,7 @@ import {
   type WebGLRenderer,
 } from 'three'
 import { gsap } from 'gsap'
-import { renderer } from '../Main'
+import { renderEngine } from '../Main'
 import { atlasInstance, legacyCamera, markRenderNeeded } from '../legacyScope'
 import { canvasUtils } from '../utils/canvas'
 import { GrowingPacker, type PackerBlock, type PackerNode } from '../utils/GrowingPacker'
@@ -70,7 +70,7 @@ let ready = false
 
 /** 主渲染器实例。 */
 function legacyRenderer(): WebGLRenderer {
-  return renderer
+  return renderEngine.renderer
 }
 
 function isPowerOfTwo(value: number): boolean {

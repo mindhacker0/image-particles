@@ -10,7 +10,7 @@ import type { Asset } from './Asset'
 import type { Texture } from './Texture'
 
 /**
- * 图集网格共用的实例化几何体：每个资产一个四边形，
+ * 图集网格共用的实例化几何体：每个资源一个四边形，
  * 每个可动画属性对应一个实例化 attribute。
  */
 
@@ -52,7 +52,7 @@ export class Geometry {
     this.geometry.copy(planeGeom as unknown as InstancedBufferGeometry)
     this.geometry.instanceCount = this.texture.getNumItemsMax()
 
-    // 用标志位记录各资产需要更新的属性
+    // 用标志位记录各资源需要更新的属性
     this.updateFlags = {
       position: false,
       color: false,
@@ -111,12 +111,12 @@ export class Geometry {
     const w = coords.w
     const h = coords.h
 
-    // 若该资产已有可用槽位（例如移除后又重新加入），则复用
+    // 若该资源已有可用槽位（例如移除后又重新加入），则复用
     const positionInBuffer = this.bufferPositionsPerAssetIds[asset.id] !== undefined
       ? this.bufferPositionsPerAssetIds[asset.id]
       : this.getNextPosition(asset.id)
 
-    // 记录该资产在 attribute 缓冲中的位置
+    // 记录该资源在 attribute 缓冲中的位置
     asset.positionInbuffer = positionInBuffer
 
     const i1 = positionInBuffer
@@ -168,13 +168,13 @@ export class Geometry {
       this.attributes[attr].needsUpdate = true
     }
 
-    // 让该资产上报同样的更新标志
+    // 让该资源上报同样的更新标志
     asset.updateFlags = this.updateFlags
 
     // 使缓存的 id 数组失效
     this.cachedIds = null
 
-    // 记录该资产的缓冲位置
+    // 记录该资源的缓冲位置
     this.bufferPositionsPerAssetIds[asset.id] = positionInBuffer
     return positionInBuffer
   }
@@ -226,7 +226,7 @@ export class Geometry {
     markRenderNeeded()
   }
 
-  // 资产在该几何体中不再可用时调用（仅出现在 LOD 等动态纹理中）
+  // 资源在该几何体中不再可用时调用（仅出现在 LOD 等动态纹理中）
   discard(asset: Asset): void {
     delete this.bufferPositionsPerAssetIds[asset.id]
   }

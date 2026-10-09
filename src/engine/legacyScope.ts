@@ -1,7 +1,7 @@
 import type { Vector3 } from 'three'
 import { cameraControls } from './camera/CameraControls'
 import { Model, getImages as getModelImages } from './data/Models'
-import { app, atlas, camera, params, scene, shared } from './Main'
+import { app, atlas, params, renderEngine } from './Main'
 
 /**
  * 对模块间共享的引擎状态做类型化访问。
@@ -34,9 +34,9 @@ export type GetImages = (
   callback: (urls: Record<string, string>) => void,
 ) => void
 
-/** 需要渲染一帧时置位（由 `Main.animate` 使用）。 */
+/** 请求渲染一帧（按需渲染，由 `RendererEngine` 处理）。 */
 export function markRenderNeeded(): void {
-  shared.renderNeeded = true
+  renderEngine?.requestRender()
 }
 
 /** 页面参数（由查询字符串和 body 属性构成）。 */
@@ -58,7 +58,7 @@ export function legacyCamera(): {
   position: Vector3
   far: number
 } {
-  return camera as unknown as { position: Vector3; far: number }
+  return renderEngine.camera as unknown as { position: Vector3; far: number }
 }
 
 /** 场景（用到 `add` 与 `remove`）。 */
@@ -66,7 +66,7 @@ export function legacyScene(): {
   add(object: unknown): void
   remove(object: unknown): void
 } {
-  return scene as unknown as { add(object: unknown): void; remove(object: unknown): void }
+  return renderEngine.scene as unknown as { add(object: unknown): void; remove(object: unknown): void }
 }
 
 /** 相机控制器。 */

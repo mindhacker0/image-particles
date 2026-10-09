@@ -20,7 +20,7 @@ import {
   legacyParams,
   markRenderNeeded,
 } from '../legacyScope'
-import { animate as mainAnimate, enableUI as mainEnableUI, setup as mainSetup, shared } from '../Main'
+import { enableUI as mainEnableUI, renderEngine, setup as mainSetup, shared } from '../Main'
 import { bigbangFormula } from '../formulas/BigbangFormula'
 import { getCurrentUrl } from '../utils/functions'
 import { Sidect } from '../../ui/sidecontent/SideContentFacade'
@@ -51,16 +51,9 @@ interface LegacyWindowPrimitives {
   numAssetsLoaded: number
   numAssetsTotal: number
   numPartners: number
-  /** 渲染器尺寸，由其它模块写入 */
-  rendererWidth: number
-  rendererHeight: number
   /** 滚轮系数，被 `cameraControls.setState` 重置 */
   mouseWheelDeltaFactor: number
   mouseWheelDeltaFactorOrbit: number
-  /**
-   * 为 true 时需要渲染一帧，通过 `markRenderNeeded()` 设置。
-   */
-  renderNeeded: boolean
 }
 
 function legacyWindow(): LegacyWindowPrimitives {
@@ -116,9 +109,9 @@ function enableUI(): void {
   mainEnableUI()
 }
 
-/** 公开的动画更新入口。 */
+/** 启动渲染循环。 */
 function animate(): void {
-  mainAnimate()
+  renderEngine.start()
 }
 
 /** 获取相机控制器实例。 */

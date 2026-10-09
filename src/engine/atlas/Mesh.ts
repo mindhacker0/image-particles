@@ -6,11 +6,11 @@ import { Material } from './Material'
 import type { Texture } from './Texture'
 
 /**
- * 静态图集网格：纹理中每个资产对应一个实例化四边形。
+ * 静态图集网格：纹理中每个资源对应一个实例化四边形。
  * `MODMesh` 与 LOD 网格都继承本类。
  */
 
-/** 累计创建的资产数量（诊断用）。 */
+/** 累计创建的资源数量（诊断用）。 */
 let totalAssets = 0
 
 export class Mesh {
@@ -22,7 +22,7 @@ export class Mesh {
   material: Material
   mesh: ThreeMesh
 
-  // 按 id 索引资产的字典
+  // 按 id 索引资源的字典
   assets: Record<string, Asset> = {}
 
   transitionPctSpeed = 0.01
@@ -53,7 +53,7 @@ export class Mesh {
       coords.w *= norm
       coords.h *= norm
 
-      // 临时处理图集中重复的资产：已存在则跳过
+      // 临时处理图集中重复的资源：已存在则跳过
       if (atlasInstance().getAsset(coords.id as string)) {
         continue
       }

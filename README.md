@@ -37,7 +37,8 @@ src/
   main.tsx            React 启动入口（把 App 挂载到 #react-root）
   App.tsx             引擎生命周期 + 启动失败提示
   engine/             WebGL 引擎
-    Main.ts           参数、渲染器、渲染循环、setup()，并持有共享状态
+    Main.ts           页面参数、预加载与启动编排；持有 shared / app / atlas
+    RendererEngine.ts 渲染引擎类：相机、场景、渲染器、按需渲染循环与尺寸同步
     legacyScope.ts    获取跨模块共享引擎状态的类型化取值器
     apps/
       AppFreefall.ts  自由落体应用
@@ -95,13 +96,9 @@ data/ imgs/           运行时静态资源，原样复制到 dist/
 
 * `twixLegacy.ts`：Worker 使用的、基于 fetch 的 ajax 辅助。
 
-`three`、`hammerjs`、`gsap` 和 `twixLegacy` 都由使用它们的模块直接 import。引擎自身的共享状态（相机、场景、渲染器、应用、图集、`params` 以及 `Main.shared` 中的可变标志）同样通过 export/import 传递，不再挂到 `window` 上。
+`three`、`hammerjs`、`gsap` 和 `twixLegacy` 都由使用它们的模块直接 import。引擎自身的状态同样通过 export/import 传递，不再挂到 `window` 上：渲染相关的相机、场景、渲染器与按需渲染循环封装在 `RendererEngine` 类中，跨模块的标志与计数放在 `Main.shared`，应用与图集实例由 `Main` 持有。
 
 Three.js 在 WebGL2 上会把 GLSL1 着色器转换为 GLSL3，其中 `texture2D` 对应内置的 `texture()`。因此开场条目与日期标签着色器中的 `texture` uniform 必须命名为 `map`，否则着色器编译失败，画面不会渲染。
-
-## 依赖
-
-`three`、`gsap`、`hammerjs`、`material-design-lite` 和 `react` 均来自 npm。MDL 主题样式表（`material-design-lite/dist/material.brown-teal.min.css`）在 `src/main.tsx` 中先于 `css/main.css` 引入，因此项目自身的样式覆盖仍然生效。
 
 ## 注意事项
 

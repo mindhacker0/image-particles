@@ -7,8 +7,8 @@ import { ColorFormula } from './ColorFormula'
 import { RandomFormula, type RandomFormulaAmplitude } from './RandomFormula'
 
 /**
- * “大爆炸”开场序列：`reset()` 先把所有资产隐藏到 berekhat ram 后方，
- * 把最旧的资产放大到随机布局中，并带动相机；`randomize()` 应用随机公式。
+ * “大爆炸”开场序列：`reset()` 先把所有资源隐藏到 berekhat ram 后方，
+ * 把最旧的资源放大到随机布局中，并带动相机；`randomize()` 应用随机公式。
  *
  * `apply(assets, commit)` 中 `commit` 用于区分首次（带动画）进入与深链接进入。
  */

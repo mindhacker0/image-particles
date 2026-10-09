@@ -5,7 +5,7 @@ import { MODMesh } from './MODMesh'
 import { highlight, resetHighlight } from './utils'
 
 /**
- * "Mesh On Demand"：按需向图集加载新资产的工具。
+ * "Mesh On Demand"：按需向图集加载新资源的工具。
  * 目前为死代码（`Atlas` 中未启用），且依赖旧版 `LODTexture` API，
  * 因此下面访问纹理时做了可选链保护。
  */
@@ -51,7 +51,7 @@ export class MOD {
       highlight(ids, new Color(0, 1, 0))
     }
 
-    // 按纹理容量限制资产数量
+    // 按纹理容量限制资源数量
     const texture = this.mesh.texture as unknown as {
       getNumItemsMax?(): number
       updateList?(list: string[], updated: boolean): void

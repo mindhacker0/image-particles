@@ -6,7 +6,7 @@ import { gsap } from 'gsap'
 import {
   disableUI as mainDisableUI,
   enableUI as mainEnableUI,
-  renderer as mainRenderer,
+  renderEngine,
   shared,
 } from '../Main'
 import { lod } from '../atlas/lod/lod'
@@ -41,7 +41,7 @@ export function hasNan(v: { x: number; y: number; z: number }): boolean {
 
 /** 渲染器实例。 */
 function renderer(): { domElement: ControlDomElement } {
-  return mainRenderer as unknown as { domElement: ControlDomElement }
+  return renderEngine.renderer as unknown as { domElement: ControlDomElement }
 }
 
 /** 检测浏览器支持的滚轮事件类型（wheel / mousewheel）。 */

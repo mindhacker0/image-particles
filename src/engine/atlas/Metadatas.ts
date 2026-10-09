@@ -11,13 +11,13 @@ import {
 import { gsap } from 'gsap'
 import { cameraControls } from '../camera/CameraControls'
 import { getItem } from '../data/Models'
-import { app, shared } from '../Main'
+import { app, renderEngine, shared } from '../Main'
 import { atlasInstance, legacyCamera, legacyParams, modelItems } from '../legacyScope'
 import { MetaDataMaterial } from './MetadataMaterial'
 import { lod } from './lod/lod'
 
 /**
- * 元数据标签模块：为附近可见的资产各生成一个 `MetadataLabel`，
+ * 元数据标签模块：为附近可见的资源各生成一个 `MetadataLabel`，
  * 并将标题 / 作者等信息绘制到 canvas 纹理上（由 `MetaDataMaterial` 使用）。
  */
 
@@ -47,7 +47,7 @@ imageLabelAndroidLinkObj.src = 'imgs/ic_smartphone.png'
 /** LOD 迭代计数。 */
 export let lodIteration = 0
 
-/** 本模块所需的图集资产字段。 */
+/** 本模块所需的图集资源字段。 */
 export interface MetadataAsset {
   id: string
   coords: { x: number; y: number; w: number; h: number }
@@ -90,13 +90,13 @@ export interface LODUpdateEvent {
 
 type LodInstance = typeof lod
 
-/** 收集并更新各资产的元数据标签。 */
+/** 收集并更新各资源的元数据标签。 */
 export class LODMetadatas {
   lod: LodInstance
   labels: MetadataLabel[]
   /**
    * 注意：尽管名字带 `Lod`，实际是数组。
-   * 它保存所有可见资产的 id，而非按 LOD 分组的字典。
+   * 它保存所有可见资源的 id，而非按 LOD 分组的字典。
    */
   labelIdsLod: string[]
   container: Object3D
@@ -155,7 +155,7 @@ export class LODMetadatas {
    * LOD 更新回调：添加新标签并移除不再使用的标签
    */
   onLODUpdate(event: LODUpdateEvent): void {
-    // 使用最近一级的资产范围来显示标签
+    // 使用最近一级的资源范围来显示标签
     // 注意：这里读取的是模块单例 `lod`，`this.lod` 仅用于事件的订阅 / 取消订阅
     let lodLimit = lod.minimumLODResolution
 
@@ -246,7 +246,7 @@ export class LODMetadatas {
   }
 }
 
-/** 将相机跳转到指定资产。 */
+/** 将相机跳转到指定资源。 */
 export function gotoAsset(id: string): void {
   currentCameraControls().gotoAsset(legacyAtlas().getAssetsFromIds([id])[0])
 }
@@ -678,13 +678,13 @@ export class MetadataLabel extends Mesh {
  * 因此只在调用时通过下面的函数读取。
  * ------------------------------------------------------------------------- */
 
-/** `renderNeeded`：为 true 时需要渲染一帧。 */
+/** 是否需要渲染一帧。 */
 function getRenderNeeded(): boolean {
-  return shared.renderNeeded
+  return renderEngine.renderNeeded
 }
 
 function setRenderNeeded(value: boolean): void {
-  shared.renderNeeded = value
+  renderEngine.renderNeeded = value
 }
 
 /** 是否隐藏元数据标签（自由落体片头时为 true）。 */

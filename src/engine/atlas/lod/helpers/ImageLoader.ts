@@ -2,7 +2,7 @@ import type { LODDescriptor } from './LODDescriptor'
 import type { LODAssetLike } from '../types'
 
 /**
- * 通过 XHR 加载资产的图像，再解码为 `Image`，
+ * 通过 XHR 加载资源的图像，再解码为 `Image`，
  * 以便绘制到 LOD 纹理中。
  */
 export type ImageLoaderCallback = (loader: ImageLoader) => void

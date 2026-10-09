@@ -30,9 +30,9 @@ export interface ModAssetEvent {
   coords: { x: number; y: number; w: number; h: number; id?: string }
 }
 
-/** 按需加载网格：把动态加载的资产追加到几何体与资产列表中。 */
+/** 按需加载网格：把动态加载的资源追加到几何体与资源列表中。 */
 export class MODMesh extends Mesh {
-  // 记录各资产在 LOD 纹理中的坐标
+  // 记录各资源在 LOD 纹理中的坐标
   assetsCoords: Record<string, ModAssetEvent['coords']> = {}
 
   onAssetInCallback: ((asset: Asset) => void) | null = null
@@ -62,7 +62,7 @@ export class MODMesh extends Mesh {
     this.geometry.append(asset, event.coords)
     this.assetsCoords[asset.id] = event.coords
 
-    // 加入本网格的资产列表
+    // 加入本网格的资源列表
     this.assets[asset.id] = asset
 
     atlasInstance().addAsset(asset.id, this)

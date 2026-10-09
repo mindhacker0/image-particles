@@ -32,7 +32,7 @@ interface AssetMesh {
 }
 
 /**
- * 图集中的一个资产：持有坐标、位置、颜色等状态。
+ * 图集中的一个资源：持有坐标、位置、颜色等状态。
  * 位置 / 颜色 / 补间通过 setter 写入并标记对应的更新标志。
  */
 export class Asset implements FormulaAsset {

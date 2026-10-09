@@ -92,7 +92,7 @@ export function getUrlsDict(
   }
 }
 
-/** 调试用：把图集中的所有资产重置为白色。 */
+/** 调试用：把图集中的所有资源重置为白色。 */
 export function resetHighlight(): void {
   const assets = atlasInstance().assets
 
@@ -101,7 +101,7 @@ export function resetHighlight(): void {
   }
 }
 
-/** 调试用：给匹配指定 id 的资产着色。 */
+/** 调试用：给匹配指定 id 的资源着色。 */
 export function highlight(results: string[], color: { r: number; g: number; b: number }): void {
   const atlas = atlasInstance()
 

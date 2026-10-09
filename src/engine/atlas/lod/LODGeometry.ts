@@ -28,7 +28,7 @@ export class LODGeometry {
   updateFlags: { position: boolean; color: boolean; tween: boolean }
   attributes: Record<string, InstancedBufferAttribute> = {}
   currPosition = 0
-  // 当前正在显示的资产列表
+  // 当前正在显示的资源列表
   assetList: Asset[] = []
 
   constructor(desc: LODDescriptor) {
@@ -41,7 +41,7 @@ export class LODGeometry {
     this.geometry.copy(planeGeom as unknown as InstancedBufferGeometry)
     this.geometry.instanceCount = desc.tileCount
 
-    // 用于向资产报告更新需求的标志字典
+    // 用于向资源报告更新需求的标志字典
     this.updateFlags = {
       position: false,
       color: false,
@@ -148,10 +148,10 @@ export class LODGeometry {
       this.attributes[attr].needsUpdate = true
     }
 
-    // 把资产的更新标志指向本几何体
+    // 把资源的更新标志指向本几何体
     asset.updateFlags = this.updateFlags
 
-    // 保存资产的引用
+    // 保存资源的引用
     if (this.assetList.indexOf(asset) !== -1) return
     this.assetList.push(asset)
   }

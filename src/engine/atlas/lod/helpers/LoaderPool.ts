@@ -3,7 +3,7 @@ import { ImageLoader } from './ImageLoader'
 import type { LODAssetLike } from '../types'
 
 /**
- * 用固定数量的 `ImageLoader` 并发消费一个资产队列，
+ * 用固定数量的 `ImageLoader` 并发消费一个资源队列，
  * 从而限制同时进行的请求数量。
  */
 export class LoaderPool {
@@ -66,7 +66,7 @@ export class LoaderPool {
   }
 
   load(assets: LODAssetLike[]): void {
-    // 把有效资产加入队列，并让空闲的加载器立即开始工作
+    // 把有效资源加入队列，并让空闲的加载器立即开始工作
     const scope = this
 
     assets.forEach(function (asset) {

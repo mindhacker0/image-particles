@@ -1,6 +1,6 @@
 import type { FormulaAsset } from '../legacyScope'
 
-/** 螺旋布局公式：把资产沿黄金角螺旋铺在平面上，波动效果在着色器中完成。 */
+/** 螺旋布局公式：把资源沿黄金角螺旋铺在平面上，波动效果在着色器中完成。 */
 export class WaveFormula {
   // 参数保留以兼容调用方
   constructor(_amp?: unknown) {}

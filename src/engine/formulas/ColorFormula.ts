@@ -1,7 +1,7 @@
 import type { Color } from 'three'
 import type { FormulaAsset } from '../legacyScope'
 
-/** 把所有资产设置为同一颜色的公式。 */
+/** 把所有资源设置为同一颜色的公式。 */
 export class ColorFormula {
   private readonly color: Color
 

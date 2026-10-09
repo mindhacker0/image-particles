@@ -12,7 +12,7 @@ import { LODTexture } from './LODTexture'
 import type { LODAssetLike } from './types'
 
 /**
- * 处理某一细节层级（LOD）资产的加载与显示：
+ * 处理某一细节层级（LOD）资源的加载与显示：
  * 将图像加入队列、重建 LOD 纹理并切换网格属性。
  */
 export class LODItem {
@@ -30,7 +30,7 @@ export class LODItem {
   texture: LODTexture
   mesh: LODMesh
 
-  // 资产列表
+  // 资源列表
   assets: LODAssetLike[] = []
 
   initialUpdate = true
@@ -112,27 +112,27 @@ export class LODItem {
     this.flushPool = []
 
     // 加载
-    // 需要下载的资产列表
+    // 需要下载的资源列表
     const assetsToLoad: LODAssetLike[] = []
-    // 尚无 URL 的资产列表
+    // 尚无 URL 的资源列表
     const missingIds: string[] = []
 
     // 步骤 1：加载还是直接显示？
     newAssets.forEach(function (asset) {
-      // 把当前 LOD 层级赋给该资产
+      // 把当前 LOD 层级赋给该资源
       if (asset.lod === scope.lod) {
         // 该文件尚未下载
         if (scope.imagePool.get(asset.id) == null) {
           // 需要加入加载队列
           assetsToLoad.push(asset)
 
-          // 若该资产从未加载过（其他 LOD 也没有），需要查找它的图像 URL
+          // 若该资源从未加载过（其他 LOD 也没有），需要查找它的图像 URL
           if (asset.image_url == null && asset.valid) {
-            // 记录资产 id，交给 getUrlsDict(missingIds) 解析
+            // 记录资源 id，交给 getUrlsDict(missingIds) 解析
             missingIds.push(asset.id)
           }
         } else {
-          // 图像已加载：资产有效时直接使用
+          // 图像已加载：资源有效时直接使用
           if (scope.checkAsset(asset)) {
             scope.addAsset(asset)
           }
@@ -148,7 +148,7 @@ export class LODItem {
     if (this.assets.length < this.tileCount) {
       // 提升缓存中已有的低 LOD 项
       newAssets.forEach(function (asset) {
-        // 该资产属于其他 LOD，尚未处理
+        // 该资源属于其他 LOD，尚未处理
         if (asset.drawn) return
 
         if (asset.lod !== scope.lod) {
@@ -159,7 +159,7 @@ export class LODItem {
       })
     }
 
-    // 显示新资产
+    // 显示新资源
     this.mesh.reset(this.assets as unknown as Asset[])
     this.mesh.append(this.flushPool)
     this.imagePool.clean(this.desc.lod)
@@ -211,7 +211,7 @@ export class LODItem {
             const items = modelItems()
 
             if (items[asset.id] && items[asset.id].image_url) {
-              // 在资产上保存该图像 URL 的引用
+              // 在资源上保存该图像 URL 的引用
               const atlasAsset = atlasInstance().getAsset(asset.id) as unknown as
                 | LODAssetLike
                 | undefined
@@ -219,7 +219,7 @@ export class LODItem {
                 atlasAsset.image_url = items[asset.id].image_url as string
               }
             } else {
-              // 该资产没有 image_url
+              // 该资源没有 image_url
               if (asset.valid) {
                 console.warn('asset: ' + asset.id + ' has no image URL')
               }

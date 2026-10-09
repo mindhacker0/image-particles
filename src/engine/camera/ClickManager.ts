@@ -11,13 +11,7 @@ import type { Atlas } from '../atlas/Atlas'
 import type { MetadataAsset } from '../atlas/Metadatas'
 import { tsneSphere } from '../atlas/TsneSphere'
 import { cameraControls as engineCameraControls } from './CameraControls'
-import {
-  app as engineApp,
-  atlas as engineAtlas,
-  camera as engineCamera,
-  renderer as engineRenderer,
-  scene as engineScene,
-} from '../Main'
+import { app as engineApp, atlas as engineAtlas, renderEngine } from '../Main'
 
 /**
  * atlas 的拾取管理器。
@@ -67,17 +61,17 @@ interface ClickApp {
 
 /** 渲染器。 */
 function renderer(): WebGLRenderer {
-  return engineRenderer
+  return renderEngine.renderer
 }
 
 /** 场景。 */
 function scene(): Scene {
-  return engineScene
+  return renderEngine.scene
 }
 
 /** 相机。 */
 function camera(): PerspectiveCamera {
-  return engineCamera
+  return renderEngine.camera
 }
 
 /** atlas 实例。 */

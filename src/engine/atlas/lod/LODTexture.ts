@@ -3,7 +3,7 @@ import type { ImageDescriptor } from './helpers/ImageDescriptor'
 import type { LODDescriptor } from './helpers/LODDescriptor'
 
 /**
- * 某一细节层级的 Canvas 纹理：每个图块存放一个资产的图像，
+ * 某一细节层级的 Canvas 纹理：每个图块存放一个资源的图像，
  * 池内容变化时重绘画布。
  */
 

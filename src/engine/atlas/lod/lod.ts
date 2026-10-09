@@ -13,7 +13,7 @@ import type { LODAssetLike } from './types'
  * 实际解码由 LODMesh 类完成。
  */
 
-/** 图集资产，额外包含 LOD 网格查询所需的成员。 */
+/** 图集资源，额外包含 LOD 网格查询所需的成员。 */
 interface GridAsset extends LODAssetLike {
   grid: { x: number; y: number; z: number }
   cameraDistance: number
@@ -148,13 +148,13 @@ export const lod: LodExports = {
     })
   },
 
-  /** 用当前屏幕上可见的资产更新各 LODItem。 */
+  /** 用当前屏幕上可见的资源更新各 LODItem。 */
   setFromCamera() {
     if (legacyCameraControls().tweening) return
     if (busy) return
     busy = true
 
-    // 获取当前屏幕上可见的资产列表
+    // 获取当前屏幕上可见的资源列表
     const newItems = getOnScreen(legacyCamera() as never)
 
     if (newItems == null) {
@@ -231,10 +231,10 @@ export const lod: LodExports = {
 }
 
 /**
- * 收集某个 3D 位置附近的资产。
+ * 收集某个 3D 位置附近的资源。
  *
  * @param position 需要检查的位置
- * @param results 用于存放该位置附近资产的数组
+ * @param results 用于存放该位置附近资源的数组
  */
 function collectGridItems(position: { x: number; y: number; z: number }, results: GridAsset[]): GridAsset[] {
   const offset = 50
@@ -319,7 +319,7 @@ function getOnScreen(camera: {
       continue
     }
 
-    // 把到相机的距离记录到资产上
+    // 把到相机的距离记录到资源上
     results[i].cameraDistance = dist
     output.push(results[i])
   }
@@ -330,7 +330,7 @@ function getOnScreen(camera: {
   })
 
   // 3 LOD 分箱
-  // 填充按 LOD 分组的资产数组
+  // 填充按 LOD 分组的资源数组
 
   // 为每个 LOD 创建一个空箱
   const bins: number[] = []
@@ -340,7 +340,7 @@ function getOnScreen(camera: {
     max += desc.tileCount
   })
 
-  // 在容量允许范围内尽可能多地把资产放入箱中
+  // 在容量允许范围内尽可能多地把资源放入箱中
   const assets: GridAsset[] = []
   let id = 0
 

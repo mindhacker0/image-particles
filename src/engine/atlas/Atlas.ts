@@ -11,7 +11,7 @@ import {
 } from 'three'
 import { gsap } from 'gsap'
 import { Model } from '../data/Models'
-import { shared } from '../Main'
+import { renderEngine } from '../Main'
 import { atlasInstance, legacyApp, legacyCamera, markRenderNeeded } from '../legacyScope'
 import { JSONLoader } from '../utils/JSONLoader'
 import { dateLabels } from './DateLabels'
@@ -23,7 +23,7 @@ import { Texture } from './Texture'
 import type { Asset } from './Asset'
 
 /**
- * 图集管理器：负责静态纹理切片、LOD、元数据标签和资产索引。
+ * 图集管理器：负责静态纹理切片、LOD、元数据标签和资源索引。
  */
 
 /** 预渲染图集的基础路径。 */
@@ -80,9 +80,9 @@ export class Atlas {
   opts: AtlasOptions
   container: Group
   jsonLoader: JSONLoader
-  // 当前图集中的所有资产
+  // 当前图集中的所有资源
   assets: Asset[]
-  // 每个资产对应的网格实例
+  // 每个资源对应的网格实例
   meshes: AtlasMesh[]
   // 按 asset id 索引的网格数组
   meshesPerAssetId: Record<string, Mesh[]>
@@ -105,7 +105,7 @@ export class Atlas {
     this.meshes = []
     this.meshesPerAssetId = {}
 
-    // LOD（细节层次）为靠近相机的资产加载更高分辨率的纹理
+    // LOD（细节层次）为靠近相机的资源加载更高分辨率的纹理
     this.lod = lod
     lod.init(null, this.container, this.meshes, this.opts.showDebug)
 
@@ -206,7 +206,7 @@ export class Atlas {
     params.atlasSize = opts.atlasSize || params.assetSize * 128
     params.numAtlasMax = opts.numAtlasMax || 10
     params.maxAssetPerAtlas = opts.maxAssetPerAtlas || null
-    // 设置单张纹理的资产上限
+    // 设置单张纹理的资源上限
     if (params.maxAssetPerAtlas) {
       // 保留的历史问题：`params.coordsPath` 从未从 `opts` 复制，且 `loadNextStatic`
       // 会重建自己的路径，因此这次拼接是死代码（上限从未生效）。
@@ -247,7 +247,7 @@ export class Atlas {
   }
 
   // 通过 texturePath 与 coordsPath 加载静态（预渲染）图集
-  // assetSize 定义该纹理中每个资产的基础尺寸
+  // assetSize 定义该纹理中每个资源的基础尺寸
   loadStatic(texturePath: string, coordsPath: string, assetSize: number): Promise<AtlasStaticData> {
     const promise = new Promise<AtlasStaticData>((resolve) => {
       // 加载纹理
@@ -307,7 +307,7 @@ export class Atlas {
     this.container.add(mesh.mesh)
     this.meshes.push(mesh)
 
-    // 注意：下面的遍历开销随资产数增长，可能较慢；
+    // 注意：下面的遍历开销随资源数增长，可能较慢；
     // 由于 LOD 初始化时 assets 字典为空，这里对 LOD / MOD 没有影响
     const assetIds = Object.keys(mesh.assets)
     let assetId
@@ -330,11 +330,11 @@ export class Atlas {
     // 更新按 assetId 索引的网格列表
     meshesPerAssetId[assetId] = meshesPerAssetId[assetId] || []
     meshesPerAssetId[assetId].push(mesh)
-    // 收集资产
+    // 收集资源
     assets.push(mesh.assets[assetId])
   }
 
-  // 返回该资产所在的所有网格
+  // 返回该资源所在的所有网格
   getAssetMeshes(id: string): Mesh[] {
     return this.meshesPerAssetId[id]
   }
@@ -342,18 +342,18 @@ export class Atlas {
   getAsset(id: string): Asset | null {
     const mesh = this.meshesPerAssetId[id]
     if (mesh) {
-      // 返回分辨率最低的资产实例
+      // 返回分辨率最低的资源实例
       return mesh[0].assets[id]
     }
     return null
   }
 
-  /** 返回用于片头动画的代表资产。 */
+  /** 返回用于片头动画的代表资源。 */
   getOldestAsset(): Asset | null {
     return this.getAsset('PgFQ5eYVxWNuJA') || this.assets[2]
   }
 
-  // 根据 assetId 数组返回资产数组
+  // 根据 assetId 数组返回资源数组
   getAssetsFromIds(ids: string[]): Asset[] {
     const result: Asset[] = []
     let asset
@@ -447,12 +447,12 @@ export class Atlas {
 
 /** 渲染器宽度。 */
 function rendererWidth(): number {
-  return shared.rendererWidth
+  return renderEngine.width
 }
 
 /** 渲染器高度。 */
 function rendererHeight(): number {
-  return shared.rendererHeight
+  return renderEngine.height
 }
 
 /** 本模块用到的 `app` 字段。 */

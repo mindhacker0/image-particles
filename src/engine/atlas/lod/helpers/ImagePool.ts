@@ -13,7 +13,7 @@ export class ImagePool {
     this.limit = limit || 16
   }
 
-  /** 存入缓存并记录其资产。 */
+  /** 存入缓存并记录其资源。 */
   add(imgDescriptor: ImageDescriptor): void {
     if (imgDescriptor.id == null) {
       return

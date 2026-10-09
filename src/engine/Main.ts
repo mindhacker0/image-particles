@@ -1,15 +1,16 @@
-import { Color, PerspectiveCamera, Scene, Vector2, WebGLRenderer } from 'three'
 import { gsap } from 'gsap'
 import { Atlas } from './atlas/Atlas'
 import { lod } from './atlas/lod/lod'
 import { clickManager } from './camera/ClickManager'
 import { cameraControls } from './camera/CameraControls'
 import { App } from './apps/AppFreefall'
+import { RendererEngine } from './RendererEngine'
 import { getQueryParams } from './utils/dom'
 
 /**
  * 自由落体引擎的启动与生命周期管理。
- * 负责页面参数、Three.js 实例、静态图集预加载、渲染循环和窗口尺寸更新。
+ * 负责页面参数、预加载流程、应用引导与窗口尺寸编排；
+ * 渲染本身（相机 / 场景 / 渲染器 / 按需渲染循环）由 `RendererEngine` 类承担。
  */
 
 /* ------------------------------------------------------------------------- *
@@ -18,10 +19,11 @@ import { getQueryParams } from './utils/dom'
 
 /**
  * 引擎运行时的共享可变状态。
+ *
+ * 这里只放跨模块读写的标志与计数；渲染相关状态（相机、场景、渲染器、尺寸、
+ * 按需渲染开关）由 `RendererEngine` 类持有，不再散落在全局。
  */
 export interface MainGlobals {
-  /** 置为 true 时请求渲染一帧 */
-  renderNeeded: boolean
   /** 播放片头时隐藏标签 */
   hideMetadata: boolean
   /** 隐藏片头首个条目标签中的链接（由 AppFreefall 设置） */
@@ -30,9 +32,7 @@ export interface MainGlobals {
   lockLOD: boolean
   disableCameraControls: boolean
   geometryTweening: boolean
-  /** 在 `initTHREE` 运行前为 undefined */
-  rendererWidth: number
-  rendererHeight: number
+  /** 视口尺寸；渲染区域尺寸见 `RendererEngine.width` / `height` */
   windowWidth: number
   windowHeight: number
   // 预加载器计数器
@@ -58,15 +58,11 @@ export interface MainGlobals {
  * 共享引用状态：各个模块在运行时都访问同一个对象，避免状态分裂。
  */
 export const shared: MainGlobals = {
-  renderNeeded: true,
   hideMetadata: false,
   displayIntroItem: false,
   lockLOD: false,
   disableCameraControls: false,
   geometryTweening: false,
-  // 在 `initTHREE` 运行前为 undefined
-  rendererWidth: undefined as unknown as number,
-  rendererHeight: undefined as unknown as number,
   windowWidth: window.innerWidth,
   windowHeight: window.innerHeight,
   numAssetsLoaded: 0,
@@ -92,61 +88,16 @@ declare const setupRemote: (() => void) | undefined
 declare const paramsBigwall: (() => void) | undefined
 
 /* ------------------------------------------------------------------------- *
- * 引擎核心对象。
+ * 引擎核心对象：由 `Main` 创建并持有。
  * ------------------------------------------------------------------------- */
 
-export let camera: PerspectiveCamera
-export let scene: Scene
-export let renderer: WebGLRenderer
-
-// 置为 true 时请求渲染一帧
-shared.renderNeeded = true
+/** 渲染引擎（相机 / 场景 / 渲染器 / 按需渲染循环），由 `setup` 创建 */
+export let renderEngine: RendererEngine
 
 /** 应用对象，由 `setup` 创建 */
 export let app: FreefallApp
 /** 图集对象，由 `appStart` 创建 */
 export let atlas: Atlas
-
-// 置为 true 时阻止 LOD 加载
-shared.lockLOD = false
-
-// 播放片头时隐藏标签
-shared.hideMetadata = false
-// 隐藏片头首个条目标签中的链接（由 AppFreefall 设置）
-shared.displayIntroItem = false
-
-export let control: unknown
-
-// 应用对象需提供条目布局逻辑（公式）、相机控制和 UI 元素，
-// 并实现下文用到的方法。
-
-shared.disableCameraControls = false
-
-/** `updateHCenteredPosition` 需要重新定位的 `.h-recenter` 元素（由 `setup` 设置） */
-export let resizeHCenteredElems: NodeListOf<HTMLElement>
-
-shared.windowWidth = window.innerWidth
-shared.windowHeight = window.innerHeight
-// `rendererWidth` / `rendererHeight` 在 `initTHREE` 运行前不赋值（保持 undefined）
-
-// 预加载器计数器
-shared.numAssetsLoaded = 0
-shared.numAssetsLoadedDisplay = 0
-shared.numAssetsFormated = 0
-shared.numAssetsTotal = 0
-shared.numPartners = 0
-shared.preloadInterval = -1
-
-shared.mouseWheelDeltaFactor_default = 1
-shared.mouseWheelDeltaFactor_defaultOrbit = 1
-shared.mouseWheelDeltaFactor_freefall = 0.07
-shared.mouseWheelDeltaFactor_tsne_max = 1.2
-shared.mouseWheelDeltaFactor_tsne_min = 0.3
-
-shared.mouseWheelDeltaFactor = shared.mouseWheelDeltaFactor_default
-shared.mouseWheelDeltaFactorOrbit = shared.mouseWheelDeltaFactor_defaultOrbit
-
-shared.currentUrl = ''
 
 export let siteBaseUrl = 'https://artsexperiments.withgoogle.com/'
 
@@ -154,7 +105,10 @@ export let siteBaseUrl = 'https://artsexperiments.withgoogle.com/'
  * 应用对象接口。
  * ------------------------------------------------------------------------- */
 
-/** `Main` 驱动应用对象用到的成员。 */
+/**
+ * `Main` 驱动应用对象用到的成员。
+ * 应用需提供条目布局逻辑（公式）、相机控制和 UI 元素。
+ */
 interface FreefallApp {
   ui?: { resize(): void; stopLoading(): void; startLoading(): void }
   editorPanel?: {
@@ -182,13 +136,13 @@ export function appStart(): void {
   // 初始化相机控制
   cameraControls.init()
 
-  scene.add(atlas.container)
+  renderEngine.scene.add(atlas.container)
 
   const mainpreloader = document.querySelector('.main-preloader')
   shared.numAssetsTotal = parseInt(mainpreloader.getAttribute('data-items'), 10)
   shared.numPartners = parseInt(mainpreloader.getAttribute('data-partners'), 10)
 
-  updateHCenteredPosition()
+  renderEngine.centerVertical()
 
   if (typeof app.initLoading !== 'undefined') app.initLoading()
 
@@ -247,10 +201,8 @@ export function onAtlasLoadComplete(pct?: number): void {
   }, 10)
 }
 
-shared.geometryTweening = false
-
-/** 图集仍在过渡时清空一次 LOD。 */
-export function checkTweenInterval(): void {
+/** 图集仍在过渡时清空一次 LOD（作为每帧回调注册）。 */
+function checkTweenInterval(): void {
   if (atlas.getTransitionPct() < 1) {
     if (!shared.geometryTweening) {
       shared.geometryTweening = true
@@ -262,8 +214,8 @@ export function checkTweenInterval(): void {
 }
 
 /**
- * 初始化引擎：检查参数与 WebGL 支持，创建 Three.js 与 `App`，
- * 并启动渲染与 LOD 的定时更新。
+ * 初始化引擎：检查参数与 WebGL 支持，创建渲染引擎与 `App`，
+ * 并启动每帧更新与 LOD 定时刷新。
  */
 export function setup(width: number, height: number): void {
   checkParams()
@@ -285,14 +237,23 @@ export function setup(width: number, height: number): void {
     return
   }
 
-  // 初始化 Three.js 基础对象
-  initTHREE(width, height)
-  app = new App(camera)
+  // 创建渲染引擎（相机 / 场景 / 渲染器）
+  renderEngine = new RendererEngine({
+    width,
+    height,
+    clearColor: params.clearColor as number,
+  })
+  clickManager.init(width, height)
 
-  const container = document.getElementsByClassName('cilex-content')[0]
-  container.appendChild(renderer.domElement)
-  resizeHCenteredElems = document.querySelectorAll<HTMLElement>('.h-recenter')
+  app = new App(renderEngine.camera)
+
+  renderEngine.attachTo(document.getElementsByClassName('cilex-content')[0])
   window.addEventListener('resize', onWindowResize, false)
+
+  // 每帧回调：检查 LOD 过渡，然后更新应用与图集
+  renderEngine.onFrame(checkTweenInterval)
+  renderEngine.onFrame(() => app.update())
+  renderEngine.onFrame(() => atlas.update())
 
   appStart()
 
@@ -337,30 +298,6 @@ export function checkParams(): void {
   if (typeof paramsBigwall == 'function') paramsBigwall()
 }
 
-/** 创建相机、场景与渲染器，并应用背景色。 */
-export function initTHREE(width: number, height: number): WebGLRenderer {
-  camera = new PerspectiveCamera(30, width / height, 1, 100000)
-  scene = new Scene()
-
-  renderer = new WebGLRenderer({
-    logarithmicDepthBuffer: true,
-  })
-  renderer.setPixelRatio(window.devicePixelRatio)
-
-  // 立即应用正确的背景色
-  const c = new Color(params.clearColor)
-  renderer.setClearColor(c)
-
-  renderer.setSize(width, height)
-  clickManager.init(width, height)
-  shared.rendererWidth = width
-  shared.rendererHeight = height
-
-  // 先渲染一帧以应用背景色
-  renderer.render(scene, camera)
-  return renderer
-}
-
 /** 窗口尺寸变化时更新渲染器、相机与居中元素。`event` 未使用。 */
 export function onWindowResize(event: Event): void {
   let panelOffset = 0
@@ -370,54 +307,20 @@ export function onWindowResize(event: Event): void {
 
   shared.windowWidth = window.innerWidth - panelOffset
   shared.windowHeight = window.innerHeight
-  renderer.setSize(shared.windowWidth, shared.windowHeight)
+  renderEngine.setSize(shared.windowWidth, shared.windowHeight)
 
   if (app.editorPanel && app.editorPanel.xp_container) {
     app.editorPanel.xp_container.style.left = parseInt(String(0.5 + panelOffset), 10) + 'px'
     app.editorPanel.xp_container.style.width = shared.windowWidth + 'px'
   }
 
-  // three 的 `getSize(target)` 会把尺寸写入传入的目标对象
-  const r = new Vector2()
-  renderer.getSize(r)
-  shared.rendererWidth = r.width
-  shared.rendererHeight = r.height
-  clickManager.setSize(r.width, r.height)
-  camera.aspect = r.width / r.height
-  camera.updateProjectionMatrix()
-  renderer.render(scene, camera)
-
-  updateHCenteredPosition()
+  clickManager.setSize(renderEngine.width, renderEngine.height)
+  renderEngine.render()
+  renderEngine.centerVertical()
 
   if (app.ui) app.ui.resize()
 
   if (app && typeof app.resize == 'function') app.resize()
-}
-
-/** 让 `.h-recenter` 元素在视口中垂直居中。 */
-export function updateHCenteredPosition(): void {
-  for (let i = 0; i < resizeHCenteredElems.length; i++)
-    resizeHCenteredElems[i].style.top =
-      parseInt(
-        String(
-          window.innerHeight * 0.5 - resizeHCenteredElems[i].offsetHeight * 0.5,
-        ),
-        10,
-      ) + 'px'
-}
-
-/** 主渲染循环：仅在 `shared.renderNeeded` 为真时渲染，实现按需渲染。 */
-export function animate(): void {
-  // 检查几何体是否在过渡
-  checkTweenInterval()
-
-  requestAnimationFrame(animate)
-  app.update()
-  atlas.update()
-  if (shared.renderNeeded) {
-    renderer.render(scene, camera)
-    shared.renderNeeded = false
-  }
 }
 
 //- 全局方法
