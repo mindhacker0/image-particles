@@ -1,6 +1,6 @@
 # Image Particles（图像粒子）
 
-一个交互式 WebGL 实验：把数千张艺术作品排布在三维空间中，支持随机、球面、时间线、t-SNE 等多种粒子布局来浏览，并以“自由落体”作为开场。场景由 Three.js 渲染，界面使用 React 与 Material Design Lite，构建工具为 Vite。
+一个交互式 WebGL 实验：把数千张艺术作品排布在三维空间中，支持大爆炸、球面、时间线、t-SNE 等多种粒子布局来浏览。场景由 Three.js 渲染，界面使用 React 与 Material Design Lite，构建工具为 Vite。
 
 ## 命令
 
@@ -41,7 +41,7 @@ src/
     RendererEngine.ts 渲染引擎类：相机、场景、渲染器、按需渲染循环与尺寸同步
     legacyScope.ts    获取跨模块共享引擎状态的类型化取值器
     apps/
-      AppFreefall.ts  自由落体应用
+      AppFreefall.ts  主应用
       timeline/       Timescroll、TimelineLabel
       freefall/       IntroItem
     atlas/            Atlas、Asset、Texture、Geometry、Material、Mesh、MOD、MODMesh、

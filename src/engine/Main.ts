@@ -117,7 +117,6 @@ interface FreefallApp {
     xp_container?: HTMLElement
     getWidth(): number
   }
-  initLoading?(): void
   preloadContent?(callback: () => void): void
   resize?(): void
   update(): void
@@ -137,22 +136,10 @@ export function appStart(): void {
   cameraControls.init()
 
   renderEngine.scene.add(atlas.container)
-
-  const mainpreloader = document.querySelector('.main-preloader')
-  shared.numAssetsTotal = parseInt(mainpreloader.getAttribute('data-items'), 10)
-  shared.numPartners = parseInt(mainpreloader.getAttribute('data-partners'), 10)
-
-  renderEngine.centerVertical()
-
-  if (typeof app.initLoading !== 'undefined') app.initLoading()
-
-  gsap.to(document.querySelector('.main-preloader span'), {
-    duration: 0.7,
-    ease: 'none',
-    opacity: 1,
-    delay: 1,
-  })
-
+  //指定加载的资源数量，之前是通过界面参数获取
+  shared.numAssetsTotal = 512
+  shared.numPartners = 128
+  
   atlas.loadAllStatics(params, onAtlasLoadComplete, onAtlasLoadProgress)
 
   // 启动预加载进度刷新
@@ -163,15 +150,14 @@ export function appStart(): void {
 
 /** 刷新预加载进度显示。 */
 export function updateLoader(): void {
-  // `goSetup` 前预加载界面始终存在
-  const preloader_el = document.querySelector('.main-preloader > p') as HTMLElement
   // 平滑逼近已加载资源数
   shared.numAssetsLoadedDisplay += (shared.numAssetsLoaded - shared.numAssetsLoadedDisplay) * 0.1
   // 取整
   shared.numAssetsFormated = Math.floor(shared.numAssetsLoadedDisplay)
   // 更新 DOM
   const pct = Math.floor(shared.numAssetsFormated / shared.numAssetsTotal * 100)
-  preloader_el.innerHTML = pct + '%'
+  // 预加载进度
+  let preloader = pct + '%'
 }
 
 export function onAtlasLoadProgress(pct: number): void {
@@ -179,9 +165,6 @@ export function onAtlasLoadProgress(pct: number): void {
 }
 
 export function goSetup(): void {
-  // 移除预加载界面
-  const preloader_el = document.querySelector('.main-preloader')
-  preloader_el.parentNode.removeChild(preloader_el)
   // 启动应用
   app.setup()
 
@@ -316,7 +299,6 @@ export function onWindowResize(event: Event): void {
 
   clickManager.setSize(renderEngine.width, renderEngine.height)
   renderEngine.render()
-  renderEngine.centerVertical()
 
   if (app.ui) app.ui.resize()
 

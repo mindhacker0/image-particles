@@ -370,40 +370,6 @@ body.freefall .nav-chapter{
 	margin-left: 14px;
 }
 
-.main-preloader{
-	width: 100%;
-	text-align: center;
-  margin-top: -60px;
-	pointer-events: none;
-}
-
-.main-preloader > p {
-	font-size: 10px;
-	margin-top: 10px;
-  text-transform: uppercase;
-  font-weight: normal;
-}
-.main-preloader span{
-	opacity: 1;
-  color: grey;
-  position: relative;
-  top: 50px;
-}
-body.curatortable .main-preloader > p,
-body.tsnemap .main-preloader > p {
-	color: rgba(0,0,0,0.5);
-}
-body.tsnemap .main-preloader .mdl-spinner{
-	margin-top: 50px;
-}
-body.tsnemap .main-preloader{
-	margin-top: -160px;
-	margin-bottom: 60px;
-}
-body.freefall .main-preloader{
-	margin-top:30px
-}
-
 /** dialog popin **/
 dialog.mdl-dialog {
   position: absolute;
@@ -686,34 +652,6 @@ dialog.mdl-dialog[open]{
 	background-color: #ffffff;
 }
 
-/* start screen */
-.start-screen, .intro-start-screen{
-	position: absolute;
-	left: 0;
-	right: 0;
-	top: 0;
-	height: -moz-fit-content;
-	height: -webkit-fit-content;
-	height: fit-content;
-	height:auto;
-	margin: auto;
-	width: 100%;
-	visibility: hidden;
-  opacity: 0;
-	text-align: center;
-  transition: visibility 0s linear 0.7s, opacity 0.7s linear;
-	color: #575757;
-}
-.start-screen h2, .intro-start-screen h2{
-	padding-bottom: 30px;
-	font-size: 36px;
-	line-height: 42px;
-	font-weight: 100;
-}
-.start-screen .start-btn, .intro-start-screen .start-btn{
-	width:300px;
-}
-
 /* help start */
 .help-start{
 	position: absolute;
@@ -782,21 +720,6 @@ dialog.mdl-dialog[open]{
 	margin-top: -7px;
 	width:15px; height:15px;
 	transform: rotate(45deg);
-}
-
-/* freefall */
-
-.freefall .start-screen{
-	color: white;
-}
-.freefall .intro-start-screen{
-	text-align: left;
-	width: 540px;
-	padding: 20px;
-	box-sizing: border-box;
-	color: white;
-	margin-left: 50%;
-	max-width: 50%;
 }
 
 /* curator table */

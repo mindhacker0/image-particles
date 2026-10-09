@@ -141,8 +141,6 @@ export class App {
   /** 章节标识：始终未赋值，仅为对齐接口保留。 */
   id: string | undefined = undefined
 
-  // 由 `setup()` 赋值
-  startScreenEl: Element | null
   sideContent: Sidect
   ui: ChapterUi
   onButtonsClick: (event?: Event) => void
@@ -164,8 +162,6 @@ export class App {
   /** 初始化界面与导航，并按是否存在深链接决定进入片头还是直接启动。 */
   // App 接口实现
   setup(): void {
-    this.startScreenEl = document.body.querySelector('.start-screen')
-    this.startScreenEl.classList.remove('show')
     // 附加模块
     this.sideContent = new Sidect()
     // 界面
@@ -195,13 +191,6 @@ export class App {
     }
 
     if (params.isBigWallVersion) this.sequenceBtnClick()
-  }
-
-  // App 接口实现
-  initLoading(): void {
-    // 获取 DOM 元素
-    this.startScreenEl = document.body.querySelector('.start-screen')
-    this.startScreenEl.classList.add('show')
   }
 
   /** 作为 `introItem.init` 的就绪回调，其 `e` 参数被忽略。 */
@@ -386,9 +375,6 @@ export class App {
     // 显示头部
     this.ui.showNavs()
 
-    // 隐藏片头文字
-    this.hideIntroText()
-
     // 播放动画
     const mdl = atlas.mdLabels.labels[0]
     // `MetadataLabel.fadeOut` 不接受时长参数（固定 0.6 秒）
@@ -441,21 +427,7 @@ export class App {
   }
 
   showIntroText(): void {
-    // 获取 DOM 元素
-    const startScreenEl = document.body.querySelector('.intro-start-screen')
-    startScreenEl.classList.add('show')
-
-    // 等待开始按钮的点击
-    const btn = startScreenEl.querySelector('.start-btn')
-    btn.addEventListener(
-      'click',
-      () => {
-        this.start('random')
-      },
-      false,
-    )
-    btn.classList.add('show')
-
+    this.start('random')
     // 标记已展示过，避免后续（如清空搜索）再次显示
     this.introAlreadyShown = true
   }
@@ -493,12 +465,6 @@ export class App {
       // 会因读不到坐标而产生 NaN 四元数
       camera.lookAt(cameraControls.target.position)
     }
-  }
-
-  hideIntroText(): void {
-    // 获取 DOM 元素
-    const startScreenEl = document.body.querySelector('.intro-start-screen')
-    startScreenEl.classList.remove('show')
   }
 
   // 时间线 -------------------------------------------------

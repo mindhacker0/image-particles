@@ -13,7 +13,7 @@ export interface RendererEngineOptions {
 /**
  * 渲染引擎。
  *
- * 统一持有相机、场景与 WebGL 渲染器，负责尺寸同步、`.h-recenter` 元素居中，
+ * 统一持有相机、场景与 WebGL 渲染器，负责尺寸同步，
  * 以及“按需渲染”的主循环：只有调用过 `requestRender()` 之后才会真正渲染一帧。
  * 本类只关心“怎么渲染”，应用逻辑通过 `onFrame()` 注册的回调驱动。
  */
@@ -26,8 +26,7 @@ export class RendererEngine {
   private readonly size = new Vector2()
   /** 每帧回调，按注册顺序执行 */
   private readonly frameCallbacks: Array<() => void> = []
-  /** 需要垂直居中的 `.h-recenter` 元素 */
-  private centeredElems: NodeListOf<HTMLElement>
+ 
   private needsRender = true
   private animationFrame = 0
   private running = false
@@ -41,8 +40,6 @@ export class RendererEngine {
     this.renderer.setClearColor(new Color(options.clearColor))
     this.renderer.setSize(options.width, options.height)
     this.readSize()
-
-    this.centeredElems = document.querySelectorAll<HTMLElement>('.h-recenter')
 
     // 先渲染一帧，让背景色立即生效
     this.renderer.render(this.scene, this.camera)
@@ -114,20 +111,6 @@ export class RendererEngine {
     this.readSize()
     this.camera.aspect = this.size.width / this.size.height
     this.camera.updateProjectionMatrix()
-  }
-
-  /** 让 `.h-recenter` 元素在视口中垂直居中。 */
-  centerVertical(): void {
-    for (let i = 0; i < this.centeredElems.length; i++) {
-      const element = this.centeredElems[i]
-      element.style.top =
-        parseInt(String(window.innerHeight * 0.5 - element.offsetHeight * 0.5), 10) + 'px'
-    }
-  }
-
-  /** DOM 变化后重新查询需要居中的元素。 */
-  refreshCenteredElements(): void {
-    this.centeredElems = document.querySelectorAll<HTMLElement>('.h-recenter')
   }
 
   /** 按需渲染：仅当 `renderNeeded` 为真时渲染一帧。 */
